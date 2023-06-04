@@ -260,19 +260,14 @@ class TypeCombiner
             }
         }
 
-        foreach ($combination->object_type_params as $generic_type => $generic_type_params) {
-            $generic_type = substr($generic_type, 0, (int) strpos($generic_type, '<'));
-
-            /** @psalm-suppress ArgumentTypeCoercion Caused by the PropertyTypeCoercion above */
-            $generic_object = new TGenericObject(
-                $generic_type,
-                $generic_type_params,
-                false,
-                $combination->object_static[$generic_type] ?? false,
-                $combination->extra_types,
-                $from_docblock,
-            );
-
+        foreach (self::foldGenericObjects(
+            $combination,
+            $from_docblock,
+            $codebase,
+            $overwrite_empty_array,
+            $allow_mixed_union,
+            $literal_limit,
+        ) as $generic_object) {
             $new_types[] = $generic_object;
         }
 
@@ -386,6 +381,64 @@ class TypeCombiner
         }
 
         return $union_type;
+    }
+
+    /**
+     * @return list<Atomic>
+     */
+    private static function foldGenericObjects(
+        TypeCombination $combination,
+        bool $from_docblock,
+        ?Codebase $codebase = null,
+        bool $overwrite_empty_array = false,
+        bool $allow_mixed_union = true,
+        int $literal_limit = 500
+    ): array {
+        $groups = [];
+
+        foreach ($combination->object_type_params as $generic_type => $generic_type_params) {
+            $generic_type = substr($generic_type, 0, (int) strpos($generic_type, '<'));
+
+            if (!isset($groups[$generic_type])) {
+                $groups[$generic_type] = $generic_type_params;
+            } else {
+                $combined_type_params = [];
+
+                foreach ($generic_type_params as $offset => $generic_type_param) {
+                    $combined_type_params[] = isset($groups[$generic_type][$offset])
+                        ? self::combine(
+                            array_values(array_merge(
+                                $groups[$generic_type][$offset]->getAtomicTypes(),
+                                $generic_type_param->getAtomicTypes(),
+                            )),
+                            $codebase,
+                            $overwrite_empty_array,
+                            $allow_mixed_union,
+                            $literal_limit,
+                        )
+                        : $generic_type_param;
+                }
+                $groups[$generic_type] = $combined_type_params;
+            }
+        }
+
+        $new_types = [];
+
+        foreach ($groups as $generic_type => $generic_type_params) {
+            /** @psalm-suppress ArgumentTypeCoercion $combination->extra_types has TObject but TGenericObject has no */
+            $generic_object = new TGenericObject(
+                $generic_type,
+                $generic_type_params,
+                false,
+                $combination->object_static[$generic_type] ?? false,
+                $combination->extra_types,
+                $from_docblock,
+            );
+
+            $new_types[] = $generic_object;
+        }
+
+        return $new_types;
     }
 
     /**
