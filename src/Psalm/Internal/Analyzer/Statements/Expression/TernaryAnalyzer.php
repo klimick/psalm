@@ -326,7 +326,11 @@ class TernaryAnalyzer
             } elseif ($stmt_cond_type !== null && $stmt_cond_type->isAlwaysTruthy()) {
                 $statements_analyzer->node_data->setType($stmt, $lhs_type);
             } else {
-                $statements_analyzer->node_data->setType($stmt, Type::combineUnionTypes($lhs_type, $stmt_else_type));
+                $statements_analyzer->node_data->setType($stmt, Type::combineUnionTypes(
+                    $lhs_type,
+                    $stmt_else_type,
+                    $codebase,
+                ));
             }
         } else {
             $statements_analyzer->node_data->setType($stmt, Type::getMixed());

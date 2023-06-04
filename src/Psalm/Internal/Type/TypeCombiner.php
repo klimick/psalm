@@ -395,9 +395,33 @@ class TypeCombiner
         int $literal_limit = 500
     ): array {
         $groups = [];
+        $new_types = [];
 
         foreach ($combination->object_type_params as $generic_type => $generic_type_params) {
             $generic_type = substr($generic_type, 0, (int) strpos($generic_type, '<'));
+
+            $template_covariants = $codebase && $codebase->classlike_storage_provider->has($generic_type)
+                ? $codebase->classlike_storage_provider->get($generic_type)->template_covariants ?? []
+                : [];
+
+            foreach ($template_covariants as $covariant) {
+                if ($covariant) {
+                    continue;
+                }
+
+                /** @psalm-suppress ArgumentTypeCoercion $combination->extra_types has TObject but TGenericObject has no */
+                $generic_object = new TGenericObject(
+                    $generic_type,
+                    $generic_type_params,
+                    false,
+                    $combination->object_static[$generic_type] ?? false,
+                    $combination->extra_types,
+                    $from_docblock,
+                );
+
+                $new_types[] = $generic_object;
+                continue 2;
+            }
 
             if (!isset($groups[$generic_type])) {
                 $groups[$generic_type] = $generic_type_params;
@@ -421,8 +445,6 @@ class TypeCombiner
                 $groups[$generic_type] = $combined_type_params;
             }
         }
-
-        $new_types = [];
 
         foreach ($groups as $generic_type => $generic_type_params) {
             /** @psalm-suppress ArgumentTypeCoercion $combination->extra_types has TObject but TGenericObject has no */
