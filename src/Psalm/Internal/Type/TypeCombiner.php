@@ -395,7 +395,7 @@ class TypeCombiner
         int $literal_limit = 500
     ): array {
         $groups = [];
-        $new_types = [];
+        $unintersectable = [];
 
         foreach ($combination->object_type_params as $generic_type => $generic_type_params) {
             $generic_type = substr($generic_type, 0, (int) strpos($generic_type, '<'));
@@ -404,22 +404,17 @@ class TypeCombiner
                 ? $codebase->classlike_storage_provider->get($generic_type)->template_covariants ?? []
                 : [];
 
+            if (empty($template_covariants)) {
+                $unintersectable[] = [$generic_type, $generic_type_params];
+                continue;
+            }
+
             foreach ($template_covariants as $covariant) {
                 if ($covariant) {
                     continue;
                 }
 
-                /** @psalm-suppress ArgumentTypeCoercion $combination->extra_types has TObject but TGenericObject has no */
-                $generic_object = new TGenericObject(
-                    $generic_type,
-                    $generic_type_params,
-                    false,
-                    $combination->object_static[$generic_type] ?? false,
-                    $combination->extra_types,
-                    $from_docblock,
-                );
-
-                $new_types[] = $generic_object;
+                $unintersectable[] = [$generic_type, $generic_type_params];
                 continue 2;
             }
 
@@ -444,6 +439,22 @@ class TypeCombiner
                 }
                 $groups[$generic_type] = $combined_type_params;
             }
+        }
+
+        $new_types = [];
+
+        foreach ($unintersectable as [$generic_type, $generic_type_params]) {
+            /** @psalm-suppress ArgumentTypeCoercion $combination->extra_types has TObject but TGenericObject has no */
+            $generic_object = new TGenericObject(
+                $generic_type,
+                $generic_type_params,
+                false,
+                $combination->object_static[$generic_type] ?? false,
+                $combination->extra_types,
+                $from_docblock,
+            );
+
+            $new_types[] = $generic_object;
         }
 
         foreach ($groups as $generic_type => $generic_type_params) {
