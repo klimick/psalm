@@ -58,6 +58,7 @@ use Psalm\Type\Union;
 
 use function array_map;
 use function array_values;
+use function array_merge;
 use function in_array;
 use function md5;
 use function preg_match;
@@ -394,6 +395,17 @@ class NewAnalyzer extends CallAnalyzer
             }
 
             $template_result ??= new TemplateResult([], []);
+
+            $declaring_method_storage_id = $codebase->methods->getDeclaringMethodId($method_id);
+
+            $declaring_class_storage = $codebase->methods->getClassLikeStorageForMethod($declaring_method_storage_id);
+            $declaring_method_storage = $codebase->methods->getStorage($declaring_method_storage_id);
+
+            $template_result->template_types = array_merge(
+                $template_result->template_types,
+                $declaring_class_storage->template_types ?? [],
+                $declaring_method_storage->template_types ?? [],
+            );
 
             if (self::checkMethodArgs(
                 $method_id,
