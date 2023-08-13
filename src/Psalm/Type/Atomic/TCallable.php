@@ -27,18 +27,21 @@ final class TCallable extends Atomic
      * Constructs a new instance of a generic type
      *
      * @param list<FunctionLikeParameter> $params
+     * @param ?non-empty-list<TTemplateParam> $templates
      */
     public function __construct(
         string $value = 'callable',
         ?array $params = null,
         ?Union $return_type = null,
         ?bool $is_pure = null,
-        bool $from_docblock = false
+        bool $from_docblock = false,
+        array $templates = null
     ) {
         $this->value = $value;
         $this->params = $params;
         $this->return_type = $return_type;
         $this->is_pure = $is_pure;
+        $this->templates = $templates;
         parent::__construct($from_docblock);
     }
 

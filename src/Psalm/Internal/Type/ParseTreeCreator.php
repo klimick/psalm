@@ -3,6 +3,7 @@
 namespace Psalm\Internal\Type;
 
 use Psalm\Exception\TypeParseTreeException;
+use Psalm\Internal\Type\ParseTree\AnonymousFunctionGenericTree;
 use Psalm\Internal\Type\ParseTree\CallableParamTree;
 use Psalm\Internal\Type\ParseTree\CallableTree;
 use Psalm\Internal\Type\ParseTree\CallableWithReturnTypeTree;
@@ -95,6 +96,22 @@ class ParseTreeCreator
 
                     $this->current_leaf->terminated = true;
 
+                    if ($this->current_leaf instanceof AnonymousFunctionGenericTree &&
+                        $this->current_leaf->parent instanceof CallableTree
+                    ) {
+                        $next_token = $this->t + 1 < $this->type_token_count
+                            ? $this->type_tokens[$this->t + 1][0] ?? null
+                            : null;
+
+                        if ($next_token !== '(') {
+                            throw new TypeParseTreeException("Unexpected token '$next_token'. Expected '('.");
+                        }
+
+                        $this->t++;
+
+                        $this->current_leaf = $this->current_leaf->parent;
+                    }
+
                     break;
 
                 case '}':
@@ -141,7 +158,8 @@ class ParseTreeCreator
 
                 case 'is':
                 case 'as':
-                    $this->handleIsOrAs($type_token);
+                case 'of':
+                    $this->handleIsOrAsOrOf($type_token);
                     break;
 
                 default:
@@ -758,7 +776,7 @@ class ParseTreeCreator
     }
 
     /** @param array{0: string, 1: int, 2?: string} $type_token */
-    private function handleIsOrAs(array $type_token): void
+    private function handleIsOrAsOrOf(array $type_token): void
     {
         if ($this->t === 0) {
             $this->handleValue($type_token);
@@ -769,24 +787,19 @@ class ParseTreeCreator
                 array_pop($current_parent->children);
             }
 
-            if ($type_token[0] === 'as') {
-                $next_token = $this->t + 1 < $this->type_token_count ? $this->type_tokens[$this->t + 1] : null;
-
+            if ($type_token[0] === 'as' || $type_token[0] === 'of') {
                 if (!$this->current_leaf instanceof Value
                     || !$current_parent instanceof GenericTree
-                    || !$next_token
                 ) {
                     throw new TypeParseTreeException('Unexpected token ' . $type_token[0]);
                 }
 
                 $this->current_leaf = new TemplateAsTree(
                     $this->current_leaf->value,
-                    $next_token[0],
                     $current_parent,
                 );
 
                 $current_parent->children[] = $this->current_leaf;
-                ++$this->t;
             } elseif ($this->current_leaf instanceof Value) {
                 $this->current_leaf = new TemplateIsTree(
                     $this->current_leaf->value,
@@ -814,6 +827,31 @@ class ParseTreeCreator
 
         switch ($next_token[0] ?? null) {
             case '<':
+                if (in_array(
+                    $type_token[0],
+                    ['callable', 'pure-callable', 'Closure', '\Closure', 'pure-Closure'],
+                    true,
+                )) {
+                    $callable_parent = new CallableTree(
+                        $type_token[0],
+                        $new_parent,
+                    );
+
+                    if ($this->parse_tree instanceof Root) {
+                        $this->parse_tree = $callable_parent;
+                        $this->current_leaf = $callable_parent;
+                    }
+
+                    $new_leaf = new AnonymousFunctionGenericTree(
+                        'anonymous-function-generics',
+                        $callable_parent,
+                    );
+
+                    ++$this->t;
+
+                    break;
+                }
+
                 $new_leaf = new GenericTree(
                     $type_token[0],
                     $new_parent,

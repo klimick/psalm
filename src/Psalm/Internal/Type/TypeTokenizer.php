@@ -152,6 +152,15 @@ class TypeTokenizer
                 $type_tokens[++$rtc] = ['', ++$i];
                 $was_char = false;
                 continue;
+            } elseif ($was_space
+                && ($char === 'o')
+                && ($chars[$i + 1] ?? null) === 'f'
+                && ($chars[$i + 2] ?? null) === ' '
+            ) {
+                $type_tokens[++$rtc] = [$char . 'f', $i - 1];
+                $type_tokens[++$rtc] = ['', ++$i];
+                $was_char = false;
+                continue;
             } elseif ($was_char) {
                 $type_tokens[++$rtc] = ['', $i];
             }

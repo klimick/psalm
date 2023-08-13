@@ -35,6 +35,11 @@ trait CallableTrait
     public $is_pure;
 
     /**
+     * @var ?non-empty-array<TTemplateParam>
+     */
+    public $templates = null;
+
+    /**
      * Constructs a new instance of a generic type
      *
      * @param list<FunctionLikeParameter> $params
@@ -98,6 +103,25 @@ trait CallableTrait
         return $param_string;
     }
 
+    public function getTemplatesString(): ?string
+    {
+        $templates_string = '';
+        if ($this->templates !== null) {
+            $templates_string .= '<';
+            foreach ($this->templates as $i => $template) {
+                if ($i) {
+                    $templates_string .= ', ';
+                }
+
+                $templates_string .= $template->getId();
+            }
+
+            $templates_string .= '>';
+        }
+
+        return $templates_string;
+    }
+
     public function getReturnTypeString(): string
     {
         $return_type_string = '';
@@ -113,11 +137,12 @@ trait CallableTrait
 
     public function getKey(bool $include_extra = true): string
     {
+        $templates_string = $this->getTemplatesString();
         $param_string = $this->getParamString();
         $return_type_string = $this->getReturnTypeString();
 
         return ($this->is_pure ? 'pure-' : ($this->is_pure === null ? '' : 'impure-'))
-            . $this->value . $param_string . $return_type_string;
+            . $this->value . $templates_string . $param_string . $return_type_string;
     }
 
     /**
@@ -193,6 +218,7 @@ trait CallableTrait
 
     public function getId(bool $exact = true, bool $nested = false): string
     {
+        $templates_string = '';
         $param_string = '';
         $return_type_string = '';
 
@@ -209,6 +235,19 @@ trait CallableTrait
             $param_string .= ')';
         }
 
+        if ($this->templates !== null) {
+            $templates_string .= '<';
+            foreach ($this->templates as $i => $template) {
+                if ($i) {
+                    $templates_string .= ', ';
+                }
+
+                $templates_string .= $template->getId();
+            }
+
+            $templates_string .= '>';
+        }
+
         if ($this->return_type !== null) {
             $return_type_multiple = count($this->return_type->getAtomicTypes()) > 1;
             $return_type_string = ':' . ($return_type_multiple ? '(' : '')
@@ -216,7 +255,7 @@ trait CallableTrait
         }
 
         return ($this->is_pure ? 'pure-' : ($this->is_pure === null ? '' : 'impure-'))
-            . $this->value . $param_string . $return_type_string;
+            . $this->value . $templates_string . $param_string . $return_type_string;
     }
 
     /**

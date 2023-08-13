@@ -27,6 +27,7 @@ final class TClosure extends TNamedObject
      * @param list<FunctionLikeParameter> $params
      * @param array<string, bool> $byref_uses
      * @param array<string, TNamedObject|TTemplateParam|TIterable|TObjectWithProperties|TCallableObject> $extra_types
+     * @param ?non-empty-list<TTemplateParam> $templates
      */
     public function __construct(
         string $value = 'callable',
@@ -35,12 +36,14 @@ final class TClosure extends TNamedObject
         ?bool $is_pure = null,
         array $byref_uses = [],
         array $extra_types = [],
-        bool $from_docblock = false
+        bool $from_docblock = false,
+        array $templates = null
     ) {
         $this->params = $params;
         $this->return_type = $return_type;
         $this->is_pure = $is_pure;
         $this->byref_uses = $byref_uses;
+        $this->templates = $templates;
         parent::__construct(
             $value,
             false,

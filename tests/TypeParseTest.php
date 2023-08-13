@@ -20,6 +20,7 @@ use Psalm\Type\Union;
 use ReflectionFunction;
 
 use function function_exists;
+use function implode;
 use function mb_substr;
 use function print_r;
 use function stripos;
@@ -548,6 +549,73 @@ class TypeParseTest extends TestCase
             'callable(int, string):void',
             (string)Type::parseString('callable(int, string) : void'),
         );
+    }
+
+    public function testGenericClosure(): void
+    {
+        $type = 'Closure<A, B>(A, B): array{A, B}';
+
+        $id = implode('', [
+            'Closure<A:anonymous-fn as mixed, B:anonymous-fn as mixed>',
+            '(A:anonymous-fn as mixed, B:anonymous-fn as mixed):',
+            'list{A:anonymous-fn as mixed, B:anonymous-fn as mixed}',
+        ]);
+
+        $this->assertSame($id, Type::parseString($type)->getId());
+    }
+
+    public function testGenericClosureWithConstraints(): void
+    {
+        $type = 'Closure<A of numeric, B>(A, B): array{A, B}';
+
+        $id = implode('', [
+            'Closure<A:anonymous-fn as numeric, B:anonymous-fn as mixed>',
+            '(A:anonymous-fn as numeric, B:anonymous-fn as mixed):',
+            'list{A:anonymous-fn as numeric, B:anonymous-fn as mixed}',
+        ]);
+
+        $this->assertSame($id, Type::parseString($type)->getId());
+    }
+
+    public function testGenericClosureWithGenericConstraints(): void
+    {
+        $type = 'Closure<A of list<numeric>, B>(iterable<int, A>, iterable<int, B>): iterable<int, list{A, B}>';
+
+        $id = implode('', [
+            'Closure<A:anonymous-fn as list<numeric>, B:anonymous-fn as mixed>',
+            '(iterable<int, A:anonymous-fn as list<numeric>>, iterable<int, B:anonymous-fn as mixed>):',
+            'iterable<int, list{A:anonymous-fn as list<numeric>, B:anonymous-fn as mixed}>',
+        ]);
+
+        $this->assertSame($id, Type::parseString($type)->getId());
+    }
+
+    public function testNestedGenericClosure(): void
+    {
+        $type = 'callable<A of string>(A): (callable<B of A>(B): list{A, B})';
+
+        $id = implode('', [
+            'callable<A:anonymous-fn as string>',
+            '(A:anonymous-fn as string):',
+            'callable<B:anonymous-fn as A:anonymous-fn as string>',
+            '(B:anonymous-fn as A:anonymous-fn as string):',
+            'list{A:anonymous-fn as string, B:anonymous-fn as A:anonymous-fn as string}',
+        ]);
+
+        $this->assertSame($id, Type::parseString($type)->getId());
+    }
+
+    public function testGenericClosureWithGenericParams(): void
+    {
+        $type = 'Closure<A, B>(iterable<int, A>, iterable<int, B>): iterable<int, list{A, B}>';
+
+        $id = implode('', [
+            'Closure<A:anonymous-fn as mixed, B:anonymous-fn as mixed>',
+            '(iterable<int, A:anonymous-fn as mixed>, iterable<int, B:anonymous-fn as mixed>):',
+            'iterable<int, list{A:anonymous-fn as mixed, B:anonymous-fn as mixed}>',
+        ]);
+
+        $this->assertSame($id, Type::parseString($type)->getId());
     }
 
     public function testCallableWithoutClosingBracket(): void
