@@ -209,12 +209,11 @@ class FunctionCallAnalyzer extends CallAnalyzer
             }
         }
 
-        $already_inferred_lower_bounds = $template_result->lower_bounds;
-
-        $template_result = new TemplateResult([], []);
-
         // do this here to allow closure param checks
         if (!$is_first_class_callable && $function_call_info->function_params !== null) {
+            $already_inferred_lower_bounds = $template_result->lower_bounds;
+            $template_result = new TemplateResult([], []);
+
             ArgumentsAnalyzer::checkArgumentsMatch(
                 $statements_analyzer,
                 $stmt->getArgs(),
@@ -226,19 +225,19 @@ class FunctionCallAnalyzer extends CallAnalyzer
                 $code_location,
                 $context,
             );
+
+            CallAnalyzer::checkTemplateResult(
+                $statements_analyzer,
+                $template_result,
+                $code_location,
+                $function_call_info->function_id,
+            );
+
+            $template_result->lower_bounds = array_merge(
+                $template_result->lower_bounds,
+                $already_inferred_lower_bounds,
+            );
         }
-
-        CallAnalyzer::checkTemplateResult(
-            $statements_analyzer,
-            $template_result,
-            $code_location,
-            $function_call_info->function_id,
-        );
-
-        $template_result->lower_bounds = array_merge(
-            $template_result->lower_bounds,
-            $already_inferred_lower_bounds,
-        );
 
         if ($function_name instanceof PhpParser\Node\Name && $function_call_info->function_id) {
             $stmt_type = FunctionCallReturnTypeFetcher::fetch(

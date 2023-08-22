@@ -83,6 +83,7 @@ class FunctionCallReturnTypeFetcher
                 null,
                 $statements_analyzer,
                 true,
+                $template_result,
             );
 
             if ($candidate_callable) {

@@ -251,7 +251,8 @@ class CallableTypeComparator
         Atomic $input_type_part,
         ?TCallable $container_type_part = null,
         ?StatementsAnalyzer $statements_analyzer = null,
-        bool $expand_callable = false
+        bool $expand_callable = false,
+        ?TemplateResult $template_result = null
     ): ?Atomic {
         if ($input_type_part instanceof TList) {
             $input_type_part = $input_type_part->getKeyedArray();
@@ -267,57 +268,43 @@ class CallableTypeComparator
                     strtolower($input_type_part->value),
                 );
 
-                if ($expand_callable) {
-                    $params = [];
+                $callable = new Union([
+                    new TCallable(
+                        'callable',
+                        $function_storage->params,
+                        $function_storage->return_type,
+                        $function_storage->pure,
+                    ),
+                ]);
 
-                    foreach ($function_storage->params as $param) {
-                        if ($param->type) {
-                            $param = $param->setType(
-                                TypeExpander::expandUnion(
-                                    $codebase,
-                                    $param->type,
-                                    null,
-                                    null,
-                                    null,
-                                    true,
-                                    true,
-                                    false,
-                                    false,
-                                    true,
-                                ),
-                            );
-                        }
-
-                        $params[] = $param;
-                    }
-
-                    $return_type = null;
-
-                    if ($function_storage->return_type) {
-                        $return_type = TypeExpander::expandUnion(
-                            $codebase,
-                            $function_storage->return_type,
-                            null,
-                            null,
-                            null,
-                            true,
-                            true,
-                            false,
-                            false,
-                            true,
-                        );
-                    }
-                } else {
-                    $return_type = $function_storage->return_type;
-                    $params = $function_storage->params;
+                if ($template_result) {
+                    $callable = TemplateInferredTypeReplacer::replace(
+                        $callable,
+                        $template_result,
+                        $codebase,
+                    );
                 }
 
-                return new TCallable(
-                    'callable',
-                    $params,
-                    $return_type,
-                    $function_storage->pure,
-                );
+                if ($expand_callable) {
+                    $expanded_callable = TypeExpander::expandUnion(
+                        $codebase,
+                        $callable,
+                        null,
+                        null,
+                        null,
+                        true,
+                        true,
+                        false,
+                        false,
+                        true,
+                    );
+
+                    /** @var TCallable */
+                    return $expanded_callable->getSingleAtomic();
+                }
+
+                /** @var TCallable */
+                return $callable->getSingleAtomic();
             } catch (UnexpectedValueException $e) {
                 if (InternalCallMapHandler::inCallMap($input_type_part->value)) {
                     $args = [];

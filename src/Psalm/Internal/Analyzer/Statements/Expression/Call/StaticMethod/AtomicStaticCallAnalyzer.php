@@ -22,6 +22,7 @@ use Psalm\Internal\Analyzer\Statements\Expression\Fetch\AtomicPropertyFetchAnaly
 use Psalm\Internal\Analyzer\Statements\ExpressionAnalyzer;
 use Psalm\Internal\Analyzer\StatementsAnalyzer;
 use Psalm\Internal\MethodIdentifier;
+use Psalm\Internal\Type\TemplateInferredTypeReplacer;
 use Psalm\Internal\Type\TemplateResult;
 use Psalm\Internal\Type\TypeExpander;
 use Psalm\Issue\DeprecatedClass;
@@ -494,12 +495,23 @@ class AtomicStaticCallAnalyzer
             if ($found_method_and_class_storage) {
                 [ $method_storage ] = $found_method_and_class_storage;
 
-                $return_type_candidate = new Union([new TClosure(
-                    'Closure',
-                    $method_storage->params,
-                    $method_storage->return_type,
-                    $method_storage->pure,
-                )]);
+                $return_type_candidate = $inferred_template_result
+                    ? TemplateInferredTypeReplacer::replace(
+                        new Union([new TClosure(
+                            'Closure',
+                            $method_storage->params,
+                            $method_storage->return_type,
+                            $method_storage->pure,
+                        )]),
+                        $inferred_template_result,
+                        $codebase,
+                    )
+                    : new Union([new TClosure(
+                        'Closure',
+                        $method_storage->params,
+                        $method_storage->return_type,
+                        $method_storage->pure,
+                    )]);
             } else {
                 $method_exists = $naive_method_exists
                     || $fake_method_exists
@@ -509,12 +521,23 @@ class AtomicStaticCallAnalyzer
                 if ($method_exists) {
                     $declaring_method_id = $codebase->methods->getDeclaringMethodId($method_id) ?? $method_id;
 
-                    $return_type_candidate = new Union([new TClosure(
-                        'Closure',
-                        array_values($codebase->getMethodParams($method_id)),
-                        $codebase->getMethodReturnType($method_id, $fq_class_name),
-                        $codebase->methods->getStorage($declaring_method_id)->pure,
-                    )]);
+                    $return_type_candidate = $inferred_template_result
+                        ? TemplateInferredTypeReplacer::replace(
+                            new Union([new TClosure(
+                                'Closure',
+                                array_values($codebase->getMethodParams($method_id)),
+                                $codebase->getMethodReturnType($method_id, $fq_class_name),
+                                $codebase->methods->getStorage($declaring_method_id)->pure,
+                            )]),
+                            $inferred_template_result,
+                            $codebase,
+                        )
+                        : new Union([new TClosure(
+                            'Closure',
+                            array_values($codebase->getMethodParams($method_id)),
+                            $codebase->getMethodReturnType($method_id, $fq_class_name),
+                            $codebase->methods->getStorage($declaring_method_id)->pure,
+                        )]);
                 } else {
                     // FIXME: perhaps Psalm should complain about nonexisting method here, or throw a logic exception?
                     $return_type_candidate = Type::getClosure();

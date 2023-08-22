@@ -12,7 +12,6 @@ use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Type\TemplateInferredTypeReplacer;
 use Psalm\Internal\Type\TemplateResult;
 use Psalm\Internal\Type\TemplateStandinTypeReplacer;
-use Psalm\Internal\Type\TypeExpander;
 use Psalm\Storage\FunctionLikeParameter;
 use Psalm\Type;
 use Psalm\Type\Atomic\TCallable;
@@ -109,43 +108,6 @@ final class HighOrderFunctionArgHandler
         }
 
         return $input_function_template_result;
-    }
-
-    public static function enhanceCallableArgType(
-        Context $context,
-        PhpParser\Node\Expr $arg_expr,
-        StatementsAnalyzer $statements_analyzer,
-        HighOrderFunctionArgInfo $high_order_callable_info,
-        TemplateResult $high_order_template_result
-    ): void {
-        // Psalm can infer simple callable/closure.
-        // But can't infer first-class-callable or high-order function.
-        if ($high_order_callable_info->getType() === HighOrderFunctionArgInfo::TYPE_CALLABLE) {
-            return;
-        }
-
-        $fully_inferred_callable_type = TemplateInferredTypeReplacer::replace(
-            $high_order_callable_info->getFunctionType(),
-            $high_order_template_result,
-            $statements_analyzer->getCodebase(),
-        );
-
-        // Some templates may not have been replaced.
-        // They expansion makes error message better.
-        $expanded = TypeExpander::expandUnion(
-            $statements_analyzer->getCodebase(),
-            $fully_inferred_callable_type,
-            $context->self,
-            $context->self,
-            $context->parent,
-            true,
-            true,
-            false,
-            false,
-            true,
-        );
-
-        $statements_analyzer->node_data->setType($arg_expr, $expanded);
     }
 
     public static function getCallableArgInfo(
