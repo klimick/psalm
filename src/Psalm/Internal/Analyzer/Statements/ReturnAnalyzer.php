@@ -5,12 +5,10 @@ namespace Psalm\Internal\Analyzer\Statements;
 use PhpParser;
 use Psalm\CodeLocation;
 use Psalm\CodeLocation\DocblockTypeLocation;
-use Psalm\Codebase;
 use Psalm\Context;
 use Psalm\Exception\DocblockParseException;
 use Psalm\Internal\Analyzer\ClassLikeAnalyzer;
 use Psalm\Internal\Analyzer\ClassLikeNameOptions;
-use Psalm\Internal\Analyzer\ClosureAnalyzer;
 use Psalm\Internal\Analyzer\CommentAnalyzer;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\ClassTemplateParamCollector;
@@ -38,9 +36,7 @@ use Psalm\Storage\FunctionLikeStorage;
 use Psalm\Storage\MethodStorage;
 use Psalm\Type;
 use Psalm\Type\Atomic\TArray;
-use Psalm\Type\Atomic\TCallable;
 use Psalm\Type\Atomic\TClassString;
-use Psalm\Type\Atomic\TClosure;
 use Psalm\Type\Union;
 
 use function count;
@@ -144,16 +140,6 @@ class ReturnAnalyzer
 
         if ($stmt->expr) {
             $context->inside_return = true;
-
-            if ($stmt->expr instanceof PhpParser\Node\Expr\Closure
-                || $stmt->expr instanceof PhpParser\Node\Expr\ArrowFunction
-            ) {
-                self::potentiallyInferTypesOnClosureFromParentReturnType(
-                    $statements_analyzer,
-                    $stmt->expr,
-                    $context,
-                );
-            }
 
             if (ExpressionAnalyzer::analyze($statements_analyzer, $stmt->expr, $context) === false) {
                 $context->inside_return = false;
@@ -574,91 +560,5 @@ class ReturnAnalyzer
                 );
             }
         }
-    }
-
-    /**
-     * If a function returns a closure, we try to infer the param/return types of
-     * the inner closure.
-     *
-     * @see \Psalm\Tests\ReturnTypeTest:756
-     * @param PhpParser\Node\Expr\Closure|PhpParser\Node\Expr\ArrowFunction $expr
-     */
-    private static function potentiallyInferTypesOnClosureFromParentReturnType(
-        StatementsAnalyzer $statements_analyzer,
-        PhpParser\Node\FunctionLike $expr,
-        Context $context
-    ): void {
-        // if not returning from inside of a function, return
-        if (!$context->calling_method_id && !$context->calling_function_id) {
-            return;
-        }
-
-        $closure_id = (new ClosureAnalyzer($expr, $statements_analyzer))->getClosureId();
-        $closure_storage = $statements_analyzer
-            ->getCodebase()
-            ->getFunctionLikeStorage($statements_analyzer, $closure_id);
-
-        $parent_fn_storage = $statements_analyzer
-            ->getCodebase()
-            ->getFunctionLikeStorage(
-                $statements_analyzer,
-                $context->calling_function_id ?: $context->calling_method_id,
-            );
-
-        if ($parent_fn_storage->return_type === null) {
-            return;
-        }
-
-        // can't infer returned closure if the parent doesn't have a callable return type
-        if (!$parent_fn_storage->return_type->hasCallableType()) {
-            return;
-        }
-
-        // cannot infer if we have union/intersection types
-        if (!$parent_fn_storage->return_type->isSingle()) {
-            return;
-        }
-
-        /** @var TClosure|TCallable $parent_callable_return_type */
-        $parent_callable_return_type = $parent_fn_storage->return_type->getSingleAtomic();
-
-        if ($parent_callable_return_type->params === null && $parent_callable_return_type->return_type === null) {
-            return;
-        }
-
-        foreach ($closure_storage->params as $key => $param) {
-            $parent_param = $parent_callable_return_type->params[$key] ?? null;
-            $param->type = self::inferInnerClosureTypeFromParent(
-                $statements_analyzer->getCodebase(),
-                $param->type,
-                $parent_param->type ?? null,
-            );
-        }
-
-        $closure_storage->return_type = self::inferInnerClosureTypeFromParent(
-            $statements_analyzer->getCodebase(),
-            $closure_storage->return_type,
-            $parent_callable_return_type->return_type,
-        );
-    }
-
-    /**
-     * - If non parent type, do nothing
-     * - If no return type, infer from parent
-     * - If parent return type is more specific, infer from parent
-     * - else, do nothing
-     */
-    private static function inferInnerClosureTypeFromParent(
-        Codebase $codebase,
-        ?Union $return_type,
-        ?Union $parent_return_type
-    ): ?Union {
-        if (!$parent_return_type) {
-            return $return_type;
-        }
-        if (!$return_type || UnionTypeComparator::isContainedBy($codebase, $parent_return_type, $return_type)) {
-            return $parent_return_type;
-        }
-        return $return_type;
     }
 }
