@@ -413,6 +413,10 @@ class ClosureAnalyzer extends FunctionLikeAnalyzer
             $closure_storage->return_type,
             $parent_callable_return_type->return_type,
         );
+
+        if (!$closure_storage->template_types && $parent_callable_return_type->templates) {
+            $closure_storage->template_types = $parent_callable_return_type->getTemplatesMap();
+        }
     }
 
     /**

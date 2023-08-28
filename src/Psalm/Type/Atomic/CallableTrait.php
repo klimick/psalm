@@ -60,6 +60,22 @@ trait CallableTrait
     }
 
     /**
+     * @return array<non-empty-array<string, Union>>
+     */
+    public function getTemplatesMap(): array
+    {
+        $anonymous_template_type_map = [];
+
+        foreach ($this->templates ?? [] as $template_param) {
+            $anonymous_template_type_map[$template_param->param_name] = [
+                'anonymous-fn' => $template_param->as,
+            ];
+        }
+
+        return $anonymous_template_type_map;
+    }
+
+    /**
      * @param list<FunctionLikeParameter>|null $params
      * @return static
      */
