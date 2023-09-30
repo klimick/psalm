@@ -20,6 +20,7 @@ use Psalm\Internal\Codebase\TaintFlowGraph;
 use Psalm\Internal\DataFlow\TaintSink;
 use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Stubs\Generator\StubsGenerator;
+use Psalm\Internal\Type\Comparator\CallableTypeComparator;
 use Psalm\Internal\Type\Comparator\UnionTypeComparator;
 use Psalm\Internal\Type\TemplateInferredTypeReplacer;
 use Psalm\Internal\Type\TemplateResult;
@@ -195,19 +196,7 @@ class ArgumentsAnalyzer
                 $toggled_class_exists = true;
             }
 
-            $high_order_template_result = null;
-            $high_order_callable_info = $param
-                ? HighOrderFunctionArgHandler::getCallableArgInfo($context, $arg->value, $statements_analyzer, $param)
-                : null;
-
-            if ($param && $high_order_callable_info) {
-                $high_order_template_result = HighOrderFunctionArgHandler::remapLowerBounds(
-                    $statements_analyzer,
-                    $template_result ?? new TemplateResult([], []),
-                    $high_order_callable_info,
-                    $param->type ?? Type::getMixed(),
-                );
-            } elseif (($arg->value instanceof PhpParser\Node\Expr\Closure
+            if (($arg->value instanceof PhpParser\Node\Expr\Closure
                     || $arg->value instanceof PhpParser\Node\Expr\ArrowFunction)
                 && $param
                 && !$arg->value->getDocComment()
@@ -227,31 +216,13 @@ class ArgumentsAnalyzer
             $was_inside_call = $context->inside_call;
             $context->inside_call = true;
 
-            if (ExpressionAnalyzer::analyze(
-                $statements_analyzer,
-                $arg->value,
-                $context,
-                false,
-                null,
-                false,
-                $high_order_template_result,
-            ) === false) {
+            if (ExpressionAnalyzer::analyze($statements_analyzer, $arg->value, $context) === false) {
                 $context->inside_call = $was_inside_call;
 
                 return false;
             }
 
             $context->inside_call = $was_inside_call;
-
-            if ($high_order_callable_info && $high_order_template_result) {
-                HighOrderFunctionArgHandler::enhanceCallableArgType(
-                    $context,
-                    $arg->value,
-                    $statements_analyzer,
-                    $high_order_callable_info,
-                    $high_order_template_result,
-                );
-            }
 
             if (($argument_offset === 0 && $method_id === 'array_filter' && count($args) === 2)
                 || ($argument_offset > 0 && $method_id === 'array_map' && count($args) >= 2)
@@ -469,27 +440,10 @@ class ArgumentsAnalyzer
                         || $replaced_type_part instanceof TClosure
                     ) {
                         if (isset($replaced_type_part->params[$closure_param_offset]->type)) {
-                            $replaced_param_type = $replaced_type_part->params[$closure_param_offset]->type;
-
-                            if ($replaced_param_type->hasTemplate()) {
-                                $replaced_param_type = TypeExpander::expandUnion(
-                                    $codebase,
-                                    $replaced_param_type,
-                                    null,
-                                    null,
-                                    null,
-                                    true,
-                                    false,
-                                    false,
-                                    true,
-                                    true,
-                                );
-                            }
-
                             if ($param_storage->type && !$param_type_inferred) {
                                 $type_match_found = UnionTypeComparator::isContainedBy(
                                     $codebase,
-                                    $replaced_param_type,
+                                    $replaced_type_part->params[$closure_param_offset]->type,
                                     $param_storage->type,
                                 );
 
@@ -500,7 +454,7 @@ class ArgumentsAnalyzer
 
                             $newly_inferred_type = Type::combineUnionTypes(
                                 $newly_inferred_type,
-                                $replaced_param_type,
+                                $replaced_type_part->params[$closure_param_offset]->type,
                                 $codebase,
                             );
                         }

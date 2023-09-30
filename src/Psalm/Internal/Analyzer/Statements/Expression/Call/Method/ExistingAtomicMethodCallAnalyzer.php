@@ -72,8 +72,7 @@ class ExistingAtomicMethodCallAnalyzer extends CallAnalyzer
         ?Atomic $static_type,
         ?string $lhs_var_id,
         MethodIdentifier $method_id,
-        AtomicMethodCallAnalysisResult $result,
-        ?TemplateResult $inferred_template_result = null
+        AtomicMethodCallAnalysisResult $result
     ): Union {
         $config = $codebase->config;
 
@@ -225,13 +224,6 @@ class ExistingAtomicMethodCallAnalyzer extends CallAnalyzer
 
         $template_result = new TemplateResult([], $class_template_params ?: []);
         $template_result->lower_bounds += $method_template_params;
-
-        if ($inferred_template_result) {
-            $template_result->lower_bounds += $inferred_template_result->lower_bounds;
-        }
-        if ($method_storage && $method_storage->template_types) {
-            $template_result->template_types += $method_storage->template_types;
-        }
 
         if ($codebase->store_node_types
             && !$stmt->isFirstClassCallable()

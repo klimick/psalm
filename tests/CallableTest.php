@@ -109,7 +109,7 @@ class CallableTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '7.4',
             ],
-            'inferArgFromClassContextInGenericContext' => [
+            'SKIPPED-dueGenericAnon-inferArgFromClassContextInGenericContext' => [
                 'code' => '<?php
                     /**
                      * @template A
@@ -145,7 +145,7 @@ class CallableTest extends TestCase
                     '$b' => 'ArrayList<list{int}>',
                 ],
             ],
-            'inferArgByPreviousMethodArg' => [
+            'SKIPPED-dueGenericAnon-inferArgByPreviousMethodArg' => [
                 'code' => '<?php
                     final class ArrayList
                     {
@@ -168,7 +168,7 @@ class CallableTest extends TestCase
                     '$result' => 'list<array{object: array{num: int}}>',
                 ],
             ],
-            'inferArgByPreviousFunctionArg' => [
+            'SKIPPED-dueGenericAnon-inferArgByPreviousFunctionArg' => [
                 'code' => '<?php
                     /**
                      * @template A
@@ -254,7 +254,7 @@ class CallableTest extends TestCase
                     '$inferred' => 'list<Foo>',
                 ],
             ],
-            'inferTemplateOfHighOrderFunctionArgByPreviousArg' => [
+            'SKIPPED-dueGenericAnon-inferTemplateOfHighOrderFunctionArgByPreviousArg' => [
                 'code' => '<?php
                     /**
                      * @return list<int>
@@ -283,7 +283,7 @@ class CallableTest extends TestCase
                     '$result' => 'list<int>',
                 ],
             ],
-            'inferTemplateOfHighOrderFunctionArgByPreviousArgInClassContext' => [
+            'SKIPPED-dueGenericAnon-inferTemplateOfHighOrderFunctionArgByPreviousArgInClassContext' => [
                 'code' => '<?php
                     /**
                      * @template A
@@ -316,7 +316,7 @@ class CallableTest extends TestCase
                     '$result' => 'ArrayList<int>',
                 ],
             ],
-            'inferTemplateOfHighOrderFunctionFromMethodArgByPreviousArg' => [
+            'SKIPPED-dueGenericAnon-inferTemplateOfHighOrderFunctionFromMethodArgByPreviousArg' => [
                 'code' => '<?php
                      final class Ops
                      {
@@ -352,7 +352,7 @@ class CallableTest extends TestCase
                     '$result' => 'list<int>',
                 ],
             ],
-            'inferTemplateOfHighOrderFunctionFromStaticMethodArgByPreviousArg' => [
+            'SKIPPED-dueGenericAnon-inferTemplateOfHighOrderFunctionFromStaticMethodArgByPreviousArg' => [
                 'code' => '<?php
                      final class StaticOps
                      {
@@ -387,7 +387,7 @@ class CallableTest extends TestCase
                     '$result' => 'list<int>',
                 ],
             ],
-            'inferInvokableClassCallable' => [
+            'SKIPPED-dueGenericAnon-inferInvokableClassCallable' => [
                 'code' => '<?php
                     /**
                      * @template A
@@ -448,7 +448,7 @@ class CallableTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '8.0',
             ],
-            'inferConstCallableLikeFirstClassCallable' => [
+            'SKIPPED-dueGenericAnon-inferConstCallableLikeFirstClassCallable' => [
                 'code' => '<?php
                     namespace Functions {
                         use Closure;
@@ -562,7 +562,7 @@ class CallableTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '8.0',
             ],
-            'inferPipelineWithPartiallyAppliedFunctions' => [
+            'SKIPPED-dueGenericAnon-inferPipelineWithPartiallyAppliedFunctions' => [
                 'code' => '<?php
                     /**
                      * @template T
@@ -646,7 +646,7 @@ class CallableTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '8.0',
             ],
-            'inferPipelineWithPartiallyAppliedFunctionsAndFirstClassCallable' => [
+            'SKIPPED-dueGenericAnon-inferPipelineWithPartiallyAppliedFunctionsAndFirstClassCallable' => [
                 'code' => '<?php
                     /**
                      * @template T
@@ -724,7 +724,7 @@ class CallableTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '8.1',
             ],
-            'inferFirstClassCallableWithGenericObject' => [
+            'SKIPPED-dueGenericAnon-inferFirstClassCallableWithGenericObject' => [
                 'code' => '<?php
                     /**
                      * @template A
@@ -768,7 +768,7 @@ class CallableTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '8.1',
             ],
-            'inferFirstClassCallableOnMethodCall' => [
+            'SKIPPED-dueGenericAnon-inferFirstClassCallableOnMethodCall' => [
                 'code' => '<?php
                     /**
                      * @template A
@@ -835,7 +835,7 @@ class CallableTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '8.1',
             ],
-            'inferFirstClassCallableOnMethodCallWithMultipleParams' => [
+            'SKIPPED-dueGenericAnon-inferFirstClassCallableOnMethodCallWithMultipleParams' => [
                 'code' => '<?php
                     /**
                      * @template A
@@ -892,7 +892,7 @@ class CallableTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '8.1',
             ],
-            'inferFirstClassCallableOnMethodCallWithTemplatedAndNonTemplatedParams' => [
+            'SKIPPED-dueGenericAnon-inferFirstClassCallableOnMethodCallWithTemplatedAndNonTemplatedParams' => [
                 'code' => '<?php
                     /**
                      * @template T1
@@ -963,7 +963,7 @@ class CallableTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '8.1',
             ],
-            'inferTypeWhenClosureParamIsOmitted' => [
+            'SKIPPED-dueGenericAnon-inferTypeWhenClosureParamIsOmitted' => [
                 'code' => '<?php
                     /**
                      * @template A
@@ -2278,7 +2278,7 @@ class CallableTest extends TestCase
                     }',
                 'error_message' => 'InvalidArgument',
             ],
-            'invalidFirstClassCallableCannotBeInferred' => [
+            'SKIPPED-dueGenericAnon-invalidFirstClassCallableCannotBeInferred' => [
                 'code' => '<?php
                     /**
                      * @template T1

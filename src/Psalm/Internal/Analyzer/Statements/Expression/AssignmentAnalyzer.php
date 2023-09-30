@@ -898,7 +898,7 @@ class AssignmentAnalyzer
         PhpParser\Node\Expr\AssignRef $stmt,
         Context $context
     ): bool {
-        ExpressionAnalyzer::analyze($statements_analyzer, $stmt->expr, $context, false, null, false, null, true);
+        ExpressionAnalyzer::analyze($statements_analyzer, $stmt->expr, $context, false, null, false, true);
 
         $lhs_var_id = ExpressionIdentifier::getExtendedVarId(
             $stmt->var,

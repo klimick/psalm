@@ -374,14 +374,6 @@
       <code><![CDATA[$array->properties[0]]]></code>
     </PossiblyUndefinedIntArrayOffset>
   </file>
-  <file src="src/Psalm/Internal/Type/Comparator/CallableTypeComparator.php">
-    <LessSpecificReturnStatement>
-      <code>$callable</code>
-    </LessSpecificReturnStatement>
-    <MoreSpecificReturnType>
-      <code>TCallable|TClosure|null</code>
-    </MoreSpecificReturnType>
-  </file>
   <file src="src/Psalm/Internal/Type/SimpleAssertionReconciler.php">
     <PossiblyUndefinedIntArrayOffset>
       <code><![CDATA[$array_atomic_type->properties[0]]]></code>

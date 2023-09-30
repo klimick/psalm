@@ -47,7 +47,6 @@ use Psalm\Internal\Codebase\TaintFlowGraph;
 use Psalm\Internal\DataFlow\DataFlowNode;
 use Psalm\Internal\DataFlow\TaintSink;
 use Psalm\Internal\FileManipulation\FileManipulationBuffer;
-use Psalm\Internal\Type\TemplateResult;
 use Psalm\Issue\ForbiddenCode;
 use Psalm\Issue\UnrecognizedExpression;
 use Psalm\Issue\UnsupportedReferenceUsage;
@@ -78,7 +77,6 @@ class ExpressionAnalyzer
         bool $array_assignment = false,
         ?Context $global_context = null,
         bool $from_stmt = false,
-        ?TemplateResult $template_result = null,
         bool $assigned_to_reference = false
     ): bool {
         if (self::dispatchBeforeExpressionAnalysis($stmt, $context, $statements_analyzer) === false) {
@@ -94,7 +92,6 @@ class ExpressionAnalyzer
             $array_assignment,
             $global_context,
             $from_stmt,
-            $template_result,
             $assigned_to_reference,
         ) === false) {
             return false;
@@ -149,7 +146,6 @@ class ExpressionAnalyzer
         bool $array_assignment,
         ?Context $global_context,
         bool $from_stmt,
-        ?TemplateResult $template_result = null,
         bool $assigned_to_reference = false
     ): bool {
         if ($stmt instanceof PhpParser\Node\Expr\Variable) {
@@ -174,11 +170,11 @@ class ExpressionAnalyzer
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\MethodCall) {
-            return MethodCallAnalyzer::analyze($statements_analyzer, $stmt, $context, true, $template_result);
+            return MethodCallAnalyzer::analyze($statements_analyzer, $stmt, $context);
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\StaticCall) {
-            return StaticCallAnalyzer::analyze($statements_analyzer, $stmt, $context, $template_result);
+            return StaticCallAnalyzer::analyze($statements_analyzer, $stmt, $context);
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\ConstFetch) {
@@ -271,7 +267,7 @@ class ExpressionAnalyzer
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\New_) {
-            return NewAnalyzer::analyze($statements_analyzer, $stmt, $context, $template_result);
+            return NewAnalyzer::analyze($statements_analyzer, $stmt, $context);
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\Array_) {
@@ -287,7 +283,6 @@ class ExpressionAnalyzer
                 $statements_analyzer,
                 $stmt,
                 $context,
-                $template_result,
             );
         }
 

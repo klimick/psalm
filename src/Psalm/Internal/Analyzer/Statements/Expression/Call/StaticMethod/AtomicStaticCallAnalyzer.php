@@ -76,8 +76,7 @@ class AtomicStaticCallAnalyzer
         bool $ignore_nullable_issues,
         bool &$moved_call,
         bool &$has_mock,
-        bool &$has_existing_method,
-        ?TemplateResult $inferred_template_result = null
+        bool &$has_existing_method
     ): void {
         $intersection_types = [];
 
@@ -213,7 +212,6 @@ class AtomicStaticCallAnalyzer
                 $fq_class_name,
                 $moved_call,
                 $has_existing_method,
-                $inferred_template_result,
             );
         } else {
             if ($stmt->name instanceof PhpParser\Node\Expr) {
@@ -311,8 +309,7 @@ class AtomicStaticCallAnalyzer
         array $intersection_types,
         string $fq_class_name,
         bool &$moved_call,
-        bool &$has_existing_method,
-        ?TemplateResult $inferred_template_result = null
+        bool &$has_existing_method
     ): bool {
         $codebase = $statements_analyzer->getCodebase();
 
@@ -889,7 +886,6 @@ class AtomicStaticCallAnalyzer
             $cased_method_id,
             $class_storage,
             $moved_call,
-            $inferred_template_result,
         );
 
         return true;
