@@ -60,9 +60,9 @@ trait CallableTrait
     }
 
     /**
-     * @return array<non-empty-array<string, Union>>
+     * @return array<string, non-empty-array<string, Union>>
      */
-    public function getTemplatesMap(): array
+    public function getTemplateMap(): array
     {
         $anonymous_template_type_map = [];
 
