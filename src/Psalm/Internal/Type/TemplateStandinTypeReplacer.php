@@ -763,16 +763,6 @@ class TemplateStandinTypeReplacer
                             $existing_lower_bound->type = $key_type;
                         }
                     }
-
-                    if ($replacement_atomic_type instanceof TTemplateParam
-                        && $replacement_atomic_type->defining_class !== $calling_class
-                        && $replacement_atomic_type->defining_class !== 'fn-' . $calling_function
-                    ) {
-                        foreach ($replacement_atomic_type->as->getAtomicTypes() as $nested_type_atomic) {
-                            $replacements_found = true;
-                            $atomic_types[] = $nested_type_atomic;
-                        }
-                    }
                     // @codingStandardsIgnoreEnd
 
                     if (!$replacements_found) {
