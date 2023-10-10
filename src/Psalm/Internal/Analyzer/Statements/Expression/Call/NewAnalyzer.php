@@ -390,7 +390,11 @@ class NewAnalyzer extends CallAnalyzer
                 );
             }
 
-            $template_result = new TemplateResult([], []);
+            $template_result = ArgumentsTemplateResultCollector::collect(
+                $context,
+                $statements_analyzer,
+                (string)$method_id,
+            );
 
             if (self::checkMethodArgs(
                 $method_id,

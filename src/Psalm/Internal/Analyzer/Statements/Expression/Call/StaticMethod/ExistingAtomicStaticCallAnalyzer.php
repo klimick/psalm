@@ -10,7 +10,7 @@ use Psalm\Config;
 use Psalm\Context;
 use Psalm\FileManipulation;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
-use Psalm\Internal\Analyzer\Statements\Expression\Call\ClassTemplateParamCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplateResultCollector;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\Method\MethodCallProhibitionAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\StaticCallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
@@ -68,7 +68,6 @@ class ExistingAtomicStaticCallAnalyzer
         bool &$moved_call
     ): void {
         $fq_class_name = $method_id->fq_class_name;
-        $method_name_lc = $method_id->method_name;
 
         $codebase = $statements_analyzer->getCodebase();
         $config = $codebase->config;
@@ -145,46 +144,13 @@ class ExistingAtomicStaticCallAnalyzer
             }
         }
 
-        $found_generic_params = ClassTemplateParamCollector::collect(
-            $codebase,
-            $class_storage,
-            $class_storage,
-            $method_name_lc,
+        $template_result = ArgumentsTemplateResultCollector::collect(
+            $context,
+            $statements_analyzer,
+            (string)$method_id,
             $lhs_type_part,
-            !$statements_analyzer->isStatic() && $method_id->fq_class_name === $context->self,
+            $stmt->class instanceof PhpParser\Node\Name && $stmt->class->getParts() === ['parent'],
         );
-
-        if ($found_generic_params
-            && $stmt->class instanceof PhpParser\Node\Name
-            && $stmt->class->getParts() === ['parent']
-            && $context->self
-            && ($self_class_storage = $codebase->classlike_storage_provider->get($context->self))
-            && $self_class_storage->template_extended_params
-        ) {
-            foreach ($self_class_storage->template_extended_params as $template_fq_class_name => $extended_types) {
-                foreach ($extended_types as $type_key => $extended_type) {
-                    if (isset($found_generic_params[$type_key][$template_fq_class_name])) {
-                        $found_generic_params[$type_key][$template_fq_class_name] = $extended_type;
-                        continue;
-                    }
-
-                    foreach ($extended_type->getAtomicTypes() as $t) {
-                        if ($t instanceof TTemplateParam
-                            && isset($found_generic_params[$t->param_name][$t->defining_class])
-                        ) {
-                            $found_generic_params[$type_key][$template_fq_class_name]
-                                = $found_generic_params[$t->param_name][$t->defining_class];
-                        } else {
-                            $found_generic_params[$type_key][$template_fq_class_name]
-                                = $extended_type;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        $template_result = new TemplateResult([], $found_generic_params ?: []);
 
         if (CallAnalyzer::checkMethodArgs(
             $method_id,

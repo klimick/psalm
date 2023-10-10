@@ -9,12 +9,11 @@ use Psalm\Context;
 use Psalm\FileManipulation;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentMapPopulator;
-use Psalm\Internal\Analyzer\Statements\Expression\Call\ClassTemplateParamCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplateResultCollector;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\FunctionCallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\ExpressionIdentifier;
 use Psalm\Internal\Analyzer\StatementsAnalyzer;
-use Psalm\Internal\Analyzer\TraitAnalyzer;
 use Psalm\Internal\Codebase\AssertionsFromInheritanceResolver;
 use Psalm\Internal\Codebase\InternalCallMapHandler;
 use Psalm\Internal\FileManipulation\FileManipulationBuffer;
@@ -22,8 +21,6 @@ use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Type\Comparator\TypeComparisonResult;
 use Psalm\Internal\Type\Comparator\UnionTypeComparator;
 use Psalm\Internal\Type\TemplateInferredTypeReplacer;
-use Psalm\Internal\Type\TemplateResult;
-use Psalm\Internal\Type\TemplateStandinTypeReplacer;
 use Psalm\Internal\Type\TypeExpander;
 use Psalm\Issue\IfThisIsMismatch;
 use Psalm\Issue\InvalidPropertyAssignmentValue;
@@ -162,68 +159,14 @@ class ExistingAtomicMethodCallAnalyzer extends CallAnalyzer
 
         $class_storage = $codebase->classlike_storage_provider->get($fq_class_name);
 
-        $parent_source = $statements_analyzer->getSource();
-
-        $class_template_params = ClassTemplateParamCollector::collect(
-            $codebase,
-            $codebase->methods->getClassLikeStorageForMethod($method_id),
-            $class_storage,
-            $method_name_lc,
-            $lhs_type_part,
-            $lhs_var_id === '$this',
-        );
-
-        if ($lhs_var_id === '$this' && $parent_source instanceof FunctionLikeAnalyzer) {
-            $grandparent_source = $parent_source->getSource();
-
-            if ($grandparent_source instanceof TraitAnalyzer) {
-                $fq_trait_name = $grandparent_source->getFQCLN();
-
-                $fq_trait_name_lc = strtolower($fq_trait_name);
-
-                $trait_storage = $codebase->classlike_storage_provider->get($fq_trait_name_lc);
-
-                if (isset($trait_storage->methods[$method_name_lc])) {
-                    $trait_method_id = new MethodIdentifier($trait_storage->name, $method_name_lc);
-
-                    $class_template_params = ClassTemplateParamCollector::collect(
-                        $codebase,
-                        $codebase->methods->getClassLikeStorageForMethod($trait_method_id),
-                        $class_storage,
-                        $method_name_lc,
-                        $lhs_type_part,
-                        true,
-                    );
-                }
-            }
-        }
-
         $declaring_method_id = $codebase->methods->getDeclaringMethodId($method_id);
 
-        try {
-            $method_storage = $codebase->methods->getStorage($declaring_method_id ?? $method_id);
-        } catch (UnexpectedValueException $e) {
-            $method_storage = null;
-        }
-
-        $method_template_params = [];
-
-        if ($method_storage && $method_storage->if_this_is_type) {
-            $method_template_result = new TemplateResult($method_storage->template_types ?: [], []);
-
-            TemplateStandinTypeReplacer::fillTemplateResult(
-                $method_storage->if_this_is_type,
-                $method_template_result,
-                $codebase,
-                null,
-                new Union([$lhs_type_part]),
-            );
-
-            $method_template_params = $method_template_result->lower_bounds;
-        }
-
-        $template_result = new TemplateResult([], $class_template_params ?: []);
-        $template_result->lower_bounds += $method_template_params;
+        $template_result = ArgumentsTemplateResultCollector::collect(
+            $context,
+            $statements_analyzer,
+            (string)$method_id,
+            $lhs_type_part,
+        );
 
         if ($codebase->store_node_types
             && !$stmt->isFirstClassCallable()
@@ -296,6 +239,12 @@ class ExistingAtomicMethodCallAnalyzer extends CallAnalyzer
             if ($getter_return_type) {
                 $return_type_candidate = $getter_return_type;
             }
+        }
+
+        try {
+            $method_storage = $codebase->methods->getStorage($declaring_method_id ?? $method_id);
+        } catch (UnexpectedValueException $e) {
+            $method_storage = null;
         }
 
         if ($method_storage) {

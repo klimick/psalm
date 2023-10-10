@@ -341,6 +341,10 @@ class CallAnalyzer
             }
         }
 
+        $arguments_template_result = new TemplateResult([], []);
+        $arguments_template_result->template_types = $template_result->template_types;
+        $arguments_template_result->lower_bounds = $template_result->lower_bounds;
+
         if (ArgumentsAnalyzer::analyze(
             $statements_analyzer,
             $args,
@@ -348,7 +352,7 @@ class CallAnalyzer
             (string) $method_id,
             $method_storage->allow_named_arg_calls ?? true,
             $context,
-            $template_result,
+            $arguments_template_result,
         ) === false) {
             return false;
         }

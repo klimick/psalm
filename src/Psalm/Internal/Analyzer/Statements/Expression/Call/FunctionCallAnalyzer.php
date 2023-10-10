@@ -19,7 +19,6 @@ use Psalm\Internal\Codebase\TaintFlowGraph;
 use Psalm\Internal\DataFlow\TaintSink;
 use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Type\Comparator\CallableTypeComparator;
-use Psalm\Internal\Type\TemplateResult;
 use Psalm\Internal\Type\TypeCombiner;
 use Psalm\Issue\DeprecatedFunction;
 use Psalm\Issue\ImpureFunctionCall;
@@ -167,6 +166,12 @@ class FunctionCallAnalyzer extends CallAnalyzer
         }
 
         if (!$is_first_class_callable) {
+            $template_result = ArgumentsTemplateResultCollector::collect(
+                $context,
+                $statements_analyzer,
+                $function_call_info->function_id,
+            );
+
             ArgumentsAnalyzer::analyze(
                 $statements_analyzer,
                 $stmt->getArgs(),
@@ -174,6 +179,7 @@ class FunctionCallAnalyzer extends CallAnalyzer
                 $function_call_info->function_id,
                 $function_call_info->allow_named_args,
                 $context,
+                $template_result,
             );
         }
 
@@ -199,7 +205,11 @@ class FunctionCallAnalyzer extends CallAnalyzer
             }
         }
 
-        $template_result = new TemplateResult([], []);
+        $template_result = ArgumentsTemplateResultCollector::collect(
+            $context,
+            $statements_analyzer,
+            $function_call_info->function_id,
+        );
 
         // do this here to allow closure param checks
         if (!$is_first_class_callable && $function_call_info->function_params !== null) {
@@ -214,14 +224,14 @@ class FunctionCallAnalyzer extends CallAnalyzer
                 $code_location,
                 $context,
             );
-        }
 
-        CallAnalyzer::checkTemplateResult(
-            $statements_analyzer,
-            $template_result,
-            $code_location,
-            $function_call_info->function_id,
-        );
+            CallAnalyzer::checkTemplateResult(
+                $statements_analyzer,
+                $template_result,
+                $code_location,
+                $function_call_info->function_id,
+            );
+        }
 
         if ($function_name instanceof PhpParser\Node\Name && $function_call_info->function_id) {
             $stmt_type = FunctionCallReturnTypeFetcher::fetch(

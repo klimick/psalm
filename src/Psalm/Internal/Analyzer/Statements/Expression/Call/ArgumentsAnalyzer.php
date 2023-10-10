@@ -51,6 +51,7 @@ use Psalm\Type\Union;
 use UnexpectedValueException;
 
 use function array_map;
+use function array_merge;
 use function array_reverse;
 use function array_slice;
 use function array_values;
@@ -59,7 +60,6 @@ use function in_array;
 use function is_string;
 use function max;
 use function min;
-use function reset;
 use function strpos;
 use function strtolower;
 
@@ -245,9 +245,10 @@ class ArgumentsAnalyzer
                 && !$arg->unpack
             ) {
                 $codebase = $statements_analyzer->getCodebase();
+                $param_type = TemplateInferredTypeReplacer::replace($param->type, $template_result, $codebase);
 
                 TemplateStandinTypeReplacer::fillTemplateResult(
-                    $param->type,
+                    $param_type,
                     $template_result,
                     $codebase,
                     $statements_analyzer,
@@ -573,9 +574,8 @@ class ArgumentsAnalyzer
 
         foreach ($template_result->lower_bounds as $template_name => $type_map) {
             foreach ($type_map as $class => $lower_bounds) {
-                if (count($lower_bounds) === 1) {
-                    $class_generic_params[$template_name][$class] = reset($lower_bounds)->type;
-                }
+                $class_generic_params[$template_name][$class] =
+                    TemplateStandinTypeReplacer::getMostSpecificTypeFromBounds($lower_bounds, $codebase);
             }
         }
 
@@ -1350,9 +1350,7 @@ class ArgumentsAnalyzer
             return new TemplateResult($template_types, []);
         }
 
-        if (!$template_result->template_types) {
-            $template_result->template_types = $template_types;
-        }
+        $template_result->template_types = array_merge($template_result->template_types, $template_types);
 
         foreach ($args as $argument_offset => $arg) {
             $function_param = null;
