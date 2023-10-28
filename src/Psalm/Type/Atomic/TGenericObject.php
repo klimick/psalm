@@ -194,7 +194,7 @@ final class TGenericObject extends TNamedObject
             $template_result,
             $codebase,
         );
-        if (!$type_params && !$intersection) {
+        if ($type_params === null && $intersection === null) {
             return $this;
         }
         return new static(

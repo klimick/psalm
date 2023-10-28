@@ -154,7 +154,7 @@ final class TTemplateParam extends Atomic
         ?Codebase $codebase
     ): self {
         $intersection = $this->replaceIntersectionTemplateTypesWithArgTypes($template_result, $codebase);
-        if (!$intersection) {
+        if ($intersection === null) {
             return $this;
         }
         $cloned = clone $this;
