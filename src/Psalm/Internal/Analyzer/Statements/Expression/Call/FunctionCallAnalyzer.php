@@ -10,6 +10,8 @@ use Psalm\Internal\Algebra;
 use Psalm\Internal\Algebra\FormulaGenerator;
 use Psalm\Internal\Analyzer\AlgebraAnalyzer;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\ExpressionAnalyzer;
 use Psalm\Internal\Analyzer\StatementsAnalyzer;
@@ -19,6 +21,7 @@ use Psalm\Internal\Codebase\TaintFlowGraph;
 use Psalm\Internal\DataFlow\TaintSink;
 use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Type\Comparator\CallableTypeComparator;
+use Psalm\Internal\Type\TemplateResult;
 use Psalm\Internal\Type\TypeCombiner;
 use Psalm\Issue\DeprecatedFunction;
 use Psalm\Issue\ImpureFunctionCall;
@@ -165,13 +168,23 @@ class FunctionCallAnalyzer extends CallAnalyzer
             $set_inside_conditional = true;
         }
 
-        if (!$is_first_class_callable) {
-            $template_result = ArgumentsTemplateResultCollector::collect(
-                $context,
-                $statements_analyzer,
-                $function_call_info->function_id,
-            );
+        $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
+            $stmt,
+            $context,
+            $statements_analyzer,
+            $function_call_info->function_storage,
+        );
 
+        $was_contextual_resolver = $context->contextual_type_resolver;
+
+        $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
+            $context,
+            $codebase,
+            $function_call_info->function_storage,
+            $collected_argument_templates,
+        );
+
+        if (!$is_first_class_callable) {
             ArgumentsAnalyzer::analyze(
                 $statements_analyzer,
                 $stmt->getArgs(),
@@ -179,7 +192,6 @@ class FunctionCallAnalyzer extends CallAnalyzer
                 $function_call_info->function_id,
                 $function_call_info->allow_named_args,
                 $context,
-                $template_result,
             );
         }
 
@@ -205,10 +217,9 @@ class FunctionCallAnalyzer extends CallAnalyzer
             }
         }
 
-        $template_result = ArgumentsTemplateResultCollector::collect(
-            $context,
-            $statements_analyzer,
-            $function_call_info->function_id,
+        $template_result = new TemplateResult(
+            $collected_argument_templates->template_types,
+            $collected_argument_templates->lower_bounds,
         );
 
         // do this here to allow closure param checks
@@ -232,6 +243,8 @@ class FunctionCallAnalyzer extends CallAnalyzer
                 $function_call_info->function_id,
             );
         }
+
+        $context->contextual_type_resolver = $was_contextual_resolver;
 
         if ($function_name instanceof PhpParser\Node\Name && $function_call_info->function_id) {
             $stmt_type = FunctionCallReturnTypeFetcher::fetch(

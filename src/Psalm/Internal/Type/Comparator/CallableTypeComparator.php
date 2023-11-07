@@ -6,11 +6,14 @@ use Exception;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\Variable;
 use Psalm\Codebase;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ClassTemplateParamCollector;
 use Psalm\Internal\Analyzer\StatementsAnalyzer;
 use Psalm\Internal\Codebase\InternalCallMapHandler;
 use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Provider\NodeDataProvider;
+use Psalm\Internal\Type\TemplateResult;
 use Psalm\Internal\Type\TypeExpander;
+use Psalm\Storage\FunctionLikeParameter;
 use Psalm\Type;
 use Psalm\Type\Atomic;
 use Psalm\Type\Atomic\TArray;
@@ -25,6 +28,7 @@ use Psalm\Type\Atomic\TNamedObject;
 use Psalm\Type\Atomic\TTemplateParam;
 use UnexpectedValueException;
 
+use function array_map;
 use function array_slice;
 use function end;
 use function strtolower;
@@ -387,42 +391,81 @@ class CallableTypeComparator
             && $input_type_part->value === 'Closure'
         ) {
             return new TCallable();
-        } elseif ($input_type_part instanceof TNamedObject
-            && $codebase->classExists($input_type_part->value)
-        ) {
-            $invoke_id = new MethodIdentifier(
-                $input_type_part->value,
-                '__invoke',
-            );
-
-            if ($codebase->methods->methodExists($invoke_id)) {
-                $declaring_method_id = $codebase->methods->getDeclaringMethodId($invoke_id);
-
-                if ($declaring_method_id) {
-                    $method_storage = $codebase->methods->getStorage($declaring_method_id);
-                    $method_fqcln = $invoke_id->fq_class_name;
-                    $converted_return_type = null;
-                    if ($method_storage->return_type) {
-                        $converted_return_type = TypeExpander::expandUnion(
-                            $codebase,
-                            $method_storage->return_type,
-                            $method_fqcln,
-                            $method_fqcln,
-                            null,
-                        );
-                    }
-
-                    return new TCallable(
-                        'callable',
-                        $method_storage->params,
-                        $converted_return_type,
-                        $method_storage->pure,
-                    );
-                }
-            }
+        } elseif ($input_type_part instanceof TNamedObject) {
+            return self::getCallableFromInvokable($codebase, $input_type_part);
         }
 
         return null;
+    }
+
+    public static function getCallableFromInvokable(
+        Codebase $codebase,
+        TNamedObject $input_type_part
+    ): ?TCallable {
+        if (!$codebase->classExists($input_type_part->value)) {
+            return null;
+        }
+
+        $invoke_id = new MethodIdentifier(
+            $input_type_part->value,
+            '__invoke',
+        );
+
+        if (!$codebase->methods->methodExists($invoke_id)) {
+            return null;
+        }
+
+        $declaring_method_id = $codebase->methods->getDeclaringMethodId($invoke_id);
+
+        if ($declaring_method_id === null) {
+            return null;
+        }
+
+        $method_storage = $codebase->methods->getStorage($declaring_method_id);
+
+        $callable = new TCallable(
+            'callable',
+            array_map(
+                static fn(FunctionLikeParameter $p) => $p->type !== null
+                    ? $p->setType(TypeExpander::expandUnion(
+                        $codebase,
+                        $p->type,
+                        $invoke_id->fq_class_name,
+                        $invoke_id->fq_class_name,
+                        null,
+                    ))
+                    : $p,
+                $method_storage->params,
+            ),
+            $method_storage->return_type !== null
+                ? TypeExpander::expandUnion(
+                    $codebase,
+                    $method_storage->return_type,
+                    $invoke_id->fq_class_name,
+                    $invoke_id->fq_class_name,
+                    null,
+                )
+                : null,
+            $method_storage->pure,
+        );
+
+        $invokable_storage = $codebase->classlike_storage_provider->get($input_type_part->value);
+
+        $template_result = new TemplateResult(
+            $invokable_storage->template_types ?? [],
+            ClassTemplateParamCollector::collect(
+                $codebase,
+                $invokable_storage,
+                $invokable_storage,
+                '__invoke',
+                $input_type_part,
+            ) ?? [],
+        );
+
+        return $callable->replaceTemplateTypesWithArgTypes(
+            $template_result,
+            $codebase,
+        );
     }
 
     /** @return null|'not-callable'|MethodIdentifier */

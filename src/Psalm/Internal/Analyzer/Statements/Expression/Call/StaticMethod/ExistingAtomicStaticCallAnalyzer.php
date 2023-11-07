@@ -10,7 +10,8 @@ use Psalm\Config;
 use Psalm\Context;
 use Psalm\FileManipulation;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
-use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplateResultCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\Method\MethodCallProhibitionAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\StaticCallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
@@ -144,12 +145,27 @@ class ExistingAtomicStaticCallAnalyzer
             }
         }
 
-        $template_result = ArgumentsTemplateResultCollector::collect(
+        $method_storage = $codebase->methods->getUserMethodStorage($method_id);
+
+        $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
+            $stmt,
             $context,
             $statements_analyzer,
-            (string)$method_id,
+            $method_storage,
             $lhs_type_part,
-            $stmt->class instanceof PhpParser\Node\Name && $stmt->class->getParts() === ['parent'],
+        );
+
+        $was_contextual_type_resolver = $context->contextual_type_resolver;
+        $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
+            $context,
+            $codebase,
+            $method_storage,
+            $collected_argument_templates,
+        );
+
+        $template_result = new TemplateResult(
+            $collected_argument_templates->template_types,
+            $collected_argument_templates->lower_bounds,
         );
 
         if (CallAnalyzer::checkMethodArgs(
@@ -160,8 +176,12 @@ class ExistingAtomicStaticCallAnalyzer
             new CodeLocation($statements_analyzer->getSource(), $stmt),
             $statements_analyzer,
         ) === false) {
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
+
             return;
         }
+
+        $context->contextual_type_resolver = $was_contextual_type_resolver;
 
         $fq_class_name = $stmt->class instanceof PhpParser\Node\Name && $stmt->class->getParts() === ['parent']
             ? (string) $statements_analyzer->getFQCLN()
@@ -222,8 +242,6 @@ class ExistingAtomicStaticCallAnalyzer
                 $config,
             );
         }
-
-        $method_storage = $codebase->methods->getUserMethodStorage($method_id);
 
         if ($method_storage) {
             if ($method_storage->abstract

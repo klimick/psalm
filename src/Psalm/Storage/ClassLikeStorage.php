@@ -10,6 +10,7 @@ use Psalm\Internal\Analyzer\ClassLikeAnalyzer;
 use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Type\TypeAlias\ClassTypeAlias;
 use Psalm\Issue\CodeIssue;
+use Psalm\Type\Atomic\TGenericObject;
 use Psalm\Type\Atomic\TNamedObject;
 use Psalm\Type\Atomic\TTemplateParam;
 use Psalm\Type\Union;
@@ -549,5 +550,26 @@ final class ClassLikeStorage implements HasAttributesInterface
         }
 
         return false;
+    }
+
+    public function getNamedObjectAtomic(): ?TNamedObject
+    {
+        if ($this->is_enum || $this->is_trait) {
+            return null;
+        }
+
+        $type_params = [];
+
+        foreach ($this->template_types ?? [] as $param_name => $type_map) {
+            foreach ($type_map as $defining_class => $extends) {
+                $type_params[] = new Union([
+                    new TTemplateParam($param_name, $extends, $defining_class),
+                ]);
+            }
+        }
+
+        return $type_params !== []
+            ? new TGenericObject($this->name, $type_params)
+            : new TNamedObject($this->name);
     }
 }

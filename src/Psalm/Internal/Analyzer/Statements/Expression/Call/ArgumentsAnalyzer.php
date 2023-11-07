@@ -79,9 +79,11 @@ class ArgumentsAnalyzer
         ?array $function_params,
         ?string $method_id,
         bool $allow_named_args,
-        Context $context,
-        ?TemplateResult $template_result = null
+        Context $context
     ): ?bool {
+        // @todo: Remove when plugins for array_map/array_filter will be implemented
+        $legacy_template_result = new TemplateResult([], []);
+
         $last_param = $function_params
             ? $function_params[count($function_params) - 1]
             : null;
@@ -172,6 +174,11 @@ class ArgumentsAnalyzer
                     || $arg->value instanceof PhpParser\Node\Expr\BinaryOp
                 )
             ) {
+                $was_contextual_type_resolver = $context->contextual_type_resolver;
+                $context->contextual_type_resolver = $context->contextual_type_resolver !== null && isset($param->type)
+                    ? $context->contextual_type_resolver->withContextualType($param->type)
+                    : null;
+
                 if (self::handleByRefFunctionArg(
                     $statements_analyzer,
                     $method_id,
@@ -179,8 +186,12 @@ class ArgumentsAnalyzer
                     $arg,
                     $context,
                 ) === false) {
+                    $context->contextual_type_resolver = $was_contextual_type_resolver;
+
                     return false;
                 }
+
+                $context->contextual_type_resolver = $was_contextual_type_resolver;
 
                 continue;
             }
@@ -199,29 +210,37 @@ class ArgumentsAnalyzer
                     || $arg->value instanceof PhpParser\Node\Expr\ArrowFunction)
                 && $param
                 && !$arg->value->getDocComment()
+                && ($method_id === 'array_filter' || $method_id === 'array_map')
             ) {
                 self::handleClosureArg(
                     $statements_analyzer,
                     $args,
                     $method_id,
                     $context,
-                    $template_result ?? new TemplateResult([], []),
+                    $legacy_template_result,
                     $argument_offset,
                     $arg,
                     $param,
                 );
             }
 
+            $was_contextual_type_resolver = $context->contextual_type_resolver;
+            $context->contextual_type_resolver = $context->contextual_type_resolver !== null && isset($param->type)
+                ? $context->contextual_type_resolver->withContextualType($param->type)
+                : null;
+
             $was_inside_call = $context->inside_call;
             $context->inside_call = true;
 
             if (ExpressionAnalyzer::analyze($statements_analyzer, $arg->value, $context) === false) {
                 $context->inside_call = $was_inside_call;
+                $context->contextual_type_resolver = $was_contextual_type_resolver;
 
                 return false;
             }
 
             $context->inside_call = $was_inside_call;
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
 
             if (($argument_offset === 0 && $method_id === 'array_filter' && count($args) === 2)
                 || ($argument_offset > 0 && $method_id === 'array_map' && count($args) >= 2)
@@ -232,30 +251,7 @@ class ArgumentsAnalyzer
                     $argument_offset,
                     $arg,
                     $context,
-                    $template_result,
-                );
-            }
-
-            $inferred_arg_type = $statements_analyzer->node_data->getType($arg->value);
-
-            if (null !== $inferred_arg_type
-                && null !== $template_result
-                && null !== $param
-                && null !== $param->type
-                && !$arg->unpack
-            ) {
-                $codebase = $statements_analyzer->getCodebase();
-                $param_type = TemplateInferredTypeReplacer::replace($param->type, $template_result, $codebase);
-
-                TemplateStandinTypeReplacer::fillTemplateResult(
-                    $param_type,
-                    $template_result,
-                    $codebase,
-                    $statements_analyzer,
-                    $inferred_arg_type,
-                    $argument_offset,
-                    $context->self,
-                    $context->calling_method_id ?: $context->calling_function_id,
+                    $legacy_template_result,
                 );
             }
 
@@ -283,7 +279,7 @@ class ArgumentsAnalyzer
         int $argument_offset,
         PhpParser\Node\Arg $arg,
         Context $context,
-        ?TemplateResult &$template_result
+        TemplateResult $template_result
     ): void {
         $codebase = $statements_analyzer->getCodebase();
 
@@ -319,10 +315,6 @@ class ArgumentsAnalyzer
         );
 
         if ($replace_template_result->lower_bounds) {
-            if (!$template_result) {
-                $template_result = new TemplateResult([], []);
-            }
-
             $template_result->lower_bounds += $replace_template_result->lower_bounds;
         }
     }

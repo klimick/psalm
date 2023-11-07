@@ -364,9 +364,22 @@ class ArrayAnalyzer
             $key_type = new Union([$key_atomic_type]);
         }
 
+        $was_contextual_type_resolver = $context->contextual_type_resolver;
+
+        $context->contextual_type_resolver = $context->contextual_type_resolver !== null
+            ? ArrayAnalyzerContextualTypeExtractor::extract(
+                $item_key_type ?? Type::getInt(false, $array_creation_info->int_offset),
+                $context->contextual_type_resolver,
+            )
+            : null;
+
         if (ExpressionAnalyzer::analyze($statements_analyzer, $item->value, $context) === false) {
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
+
             return;
         }
+
+        $context->contextual_type_resolver = $was_contextual_type_resolver;
 
         $array_creation_info->all_list = $array_creation_info->all_list && $item_is_list_item;
 

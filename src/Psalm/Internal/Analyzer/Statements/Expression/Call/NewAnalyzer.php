@@ -11,6 +11,8 @@ use Psalm\Internal\Analyzer\ClassAnalyzer;
 use Psalm\Internal\Analyzer\ClassLikeAnalyzer;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
 use Psalm\Internal\Analyzer\NamespaceAnalyzer;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\Method\MethodVisibilityAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\ExpressionAnalyzer;
@@ -390,10 +392,30 @@ class NewAnalyzer extends CallAnalyzer
                 );
             }
 
-            $template_result = ArgumentsTemplateResultCollector::collect(
+            $declaring_method_id = $codebase->methods->getDeclaringMethodId($method_id);
+
+            $method_storage = $declaring_method_id !== null
+                ? $codebase->methods->getStorage($declaring_method_id)
+                : null;
+
+            $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
+                $stmt,
                 $context,
                 $statements_analyzer,
-                (string)$method_id,
+                $method_storage,
+            );
+
+            $was_contextual_type_resolver = $context->contextual_type_resolver;
+            $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
+                $context,
+                $codebase,
+                $method_storage,
+                $collected_argument_templates,
+            );
+
+            $template_result = new TemplateResult(
+                $collected_argument_templates->template_types,
+                $collected_argument_templates->lower_bounds,
             );
 
             if (self::checkMethodArgs(
@@ -404,8 +426,12 @@ class NewAnalyzer extends CallAnalyzer
                 new CodeLocation($statements_analyzer->getSource(), $stmt),
                 $statements_analyzer,
             ) === false) {
+                $context->contextual_type_resolver = $was_contextual_type_resolver;
+
                 return;
             }
+
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
 
             if (MethodVisibilityAnalyzer::analyze(
                 $method_id,
@@ -417,11 +443,7 @@ class NewAnalyzer extends CallAnalyzer
                 return;
             }
 
-            $declaring_method_id = $codebase->methods->getDeclaringMethodId($method_id);
-
-            if ($declaring_method_id) {
-                $method_storage = $codebase->methods->getStorage($declaring_method_id);
-
+            if ($declaring_method_id && $method_storage) {
                 $caller_identifier = $statements_analyzer->getFullyQualifiedFunctionMethodOrNamespaceName() ?: '';
                 if (!NamespaceAnalyzer::isWithinAny($caller_identifier, $method_storage->internal)) {
                     IssueBuffer::maybeAdd(

@@ -908,8 +908,7 @@ class AtomicMethodCallAnalyzer extends CallAnalyzer
         PhpParser\Node\Expr\MethodCall $stmt,
         Context $context,
         ?TCallable $lhs_type_part_callable,
-        AtomicMethodCallAnalysisResult $result,
-        ?TemplateResult $inferred_template_result = null
+        AtomicMethodCallAnalysisResult $result
     ): void {
         $method_id = 'object::__invoke';
         $result->existent_method_ids[] = $method_id;
@@ -928,8 +927,6 @@ class AtomicMethodCallAnalyzer extends CallAnalyzer
                 $result->too_many_arguments_method_ids[] = new MethodIdentifier('callable-object', '__invoke');
             }
 
-            $template_result = $inferred_template_result ?? new TemplateResult([], []);
-
             ArgumentsAnalyzer::analyze(
                 $statements_analyzer,
                 $stmt->getArgs(),
@@ -937,7 +934,6 @@ class AtomicMethodCallAnalyzer extends CallAnalyzer
                 $method_id,
                 false,
                 $context,
-                $template_result,
             );
 
             ArgumentsAnalyzer::checkArgumentsMatch(
@@ -947,7 +943,7 @@ class AtomicMethodCallAnalyzer extends CallAnalyzer
                 $lhs_type_part_callable->params ?? [],
                 null,
                 null,
-                $template_result,
+                new TemplateResult([], []),
                 new CodeLocation($statements_analyzer->getSource(), $stmt),
                 $context,
             );

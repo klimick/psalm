@@ -315,12 +315,6 @@
       <code><![CDATA[$method_tree->children[1]]]></code>
     </PossiblyUndefinedIntArrayOffset>
   </file>
-  <file src="src/Psalm/Internal/PhpVisitor/Reflector/ClassLikeNodeScanner.php">
-    <PossiblyUndefinedIntArrayOffset>
-      <code>$l[4]</code>
-      <code>$r[4]</code>
-    </PossiblyUndefinedIntArrayOffset>
-  </file>
   <file src="src/Psalm/Internal/PhpVisitor/Reflector/ExpressionScanner.php">
     <PossiblyUndefinedIntArrayOffset>
       <code><![CDATA[$node->getArgs()[0]]]></code>

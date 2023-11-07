@@ -191,11 +191,18 @@ class StatementsAnalyzer extends SourceAnalyzer
             self::hoistConstants($this, $stmts, $context);
         }
 
+        $was_contextual_resolver = $context->contextual_type_resolver;
+        $context->contextual_type_resolver = null;
+
         foreach ($stmts as $stmt) {
             if (self::analyzeStatement($this, $stmt, $context, $global_context) === false) {
+                $context->contextual_type_resolver = $was_contextual_resolver;
+
                 return false;
             }
         }
+
+        $context->contextual_type_resolver = $was_contextual_resolver;
 
         if ($root_scope
             && !$context->collect_initializations

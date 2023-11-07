@@ -9,7 +9,8 @@ use Psalm\Context;
 use Psalm\FileManipulation;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentMapPopulator;
-use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplateResultCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\FunctionCallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\ExpressionIdentifier;
@@ -21,6 +22,7 @@ use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Type\Comparator\TypeComparisonResult;
 use Psalm\Internal\Type\Comparator\UnionTypeComparator;
 use Psalm\Internal\Type\TemplateInferredTypeReplacer;
+use Psalm\Internal\Type\TemplateResult;
 use Psalm\Internal\Type\TypeExpander;
 use Psalm\Issue\IfThisIsMismatch;
 use Psalm\Issue\InvalidPropertyAssignmentValue;
@@ -161,11 +163,23 @@ class ExistingAtomicMethodCallAnalyzer extends CallAnalyzer
 
         $declaring_method_id = $codebase->methods->getDeclaringMethodId($method_id);
 
-        $template_result = ArgumentsTemplateResultCollector::collect(
+        try {
+            $method_storage = $codebase->methods->getStorage($declaring_method_id ?? $method_id);
+        } catch (UnexpectedValueException $e) {
+            $method_storage = null;
+        }
+
+        $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
+            $stmt,
             $context,
             $statements_analyzer,
-            (string)$method_id,
+            $method_storage,
             $lhs_type_part,
+        );
+
+        $template_result = new TemplateResult(
+            $collected_argument_templates->template_types,
+            $collected_argument_templates->lower_bounds,
         );
 
         if ($codebase->store_node_types
@@ -183,15 +197,29 @@ class ExistingAtomicMethodCallAnalyzer extends CallAnalyzer
 
         $is_first_class_callable = $stmt->isFirstClassCallable();
 
-        if (!$is_first_class_callable && self::checkMethodArgs(
-            $method_id,
-            $args,
-            $template_result,
-            $context,
-            new CodeLocation($source, $stmt_name),
-            $statements_analyzer,
-        ) === false) {
-            return Type::getMixed();
+        if (!$is_first_class_callable) {
+            $was_contextual_type_resolver = $context->contextual_type_resolver;
+            $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
+                $context,
+                $codebase,
+                $method_storage,
+                $collected_argument_templates,
+            );
+
+            if (self::checkMethodArgs(
+                $method_id,
+                $args,
+                $template_result,
+                $context,
+                new CodeLocation($source, $stmt_name),
+                $statements_analyzer,
+            ) === false) {
+                $context->contextual_type_resolver = $was_contextual_type_resolver;
+
+                return Type::getMixed();
+            }
+
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
         }
 
         $return_type_candidate = MethodCallReturnTypeFetcher::fetch(
@@ -239,12 +267,6 @@ class ExistingAtomicMethodCallAnalyzer extends CallAnalyzer
             if ($getter_return_type) {
                 $return_type_candidate = $getter_return_type;
             }
-        }
-
-        try {
-            $method_storage = $codebase->methods->getStorage($declaring_method_id ?? $method_id);
-        } catch (UnexpectedValueException $e) {
-            $method_storage = null;
         }
 
         if ($method_storage) {

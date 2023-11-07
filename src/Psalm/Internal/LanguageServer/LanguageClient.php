@@ -68,15 +68,21 @@ class LanguageClient
     {
         $capabilities = $this->server->clientCapabilities;
         if ($capabilities->workspace->configuration ?? false) {
-            $this->workspace->requestConfiguration('psalm')->onResolve(function ($error, $value): void {
-                if ($error) {
-                    $this->server->logError('There was an error getting configuration');
-                } else {
-                    /** @var array<int, object> $value */
-                    [$config] = $value;
-                    $this->configurationRefreshed((array) $config);
-                }
-            });
+            $this->workspace->requestConfiguration('psalm')->onResolve(
+                /**
+                 * @param mixed $error
+                 * @param mixed $value
+                 */
+                function ($error, $value): void {
+                    if ($error) {
+                        $this->server->logError('There was an error getting configuration');
+                    } else {
+                        /** @var array<int, object> $value */
+                        [$config] = $value;
+                        $this->configurationRefreshed((array) $config);
+                    }
+                },
+            );
         }
     }
 

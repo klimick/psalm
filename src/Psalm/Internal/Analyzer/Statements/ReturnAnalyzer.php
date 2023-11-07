@@ -6,6 +6,7 @@ use PhpParser;
 use Psalm\CodeLocation;
 use Psalm\CodeLocation\DocblockTypeLocation;
 use Psalm\Context;
+use Psalm\ContextualTypeResolver;
 use Psalm\Exception\DocblockParseException;
 use Psalm\Internal\Analyzer\ClassLikeAnalyzer;
 use Psalm\Internal\Analyzer\ClassLikeNameOptions;
@@ -141,9 +142,25 @@ class ReturnAnalyzer
         if ($stmt->expr) {
             $context->inside_return = true;
 
+            $was_contextual_type_resolver = $context->contextual_type_resolver;
+
+            $next_contextual_type = ReturnAnalyzerContextualTypeExtractor::extract(
+                $codebase,
+                $statements_analyzer,
+            );
+
+            $context->contextual_type_resolver = $next_contextual_type !== null
+                ? new ContextualTypeResolver(
+                    $next_contextual_type,
+                    new TemplateResult([], []),
+                    $codebase,
+                )
+                : null;
+
             if (ExpressionAnalyzer::analyze($statements_analyzer, $stmt->expr, $context) === false) {
                 $context->inside_return = false;
                 $context->has_returned = true;
+                $context->contextual_type_resolver = $was_contextual_type_resolver;
 
                 return;
             }
@@ -181,6 +198,7 @@ class ReturnAnalyzer
             }
 
             $context->inside_return = false;
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
         } else {
             $stmt_type = Type::getVoid();
         }

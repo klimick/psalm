@@ -132,6 +132,14 @@ class ExpressionAnalyzer
             return false;
         }
 
+        if ($context->contextual_type_resolver !== null) {
+            $inferred_type = $statements_analyzer->node_data->getType($stmt);
+
+            if ($inferred_type !== null) {
+                $context->contextual_type_resolver->fillTemplateResult($inferred_type);
+            }
+        }
+
         return true;
     }
 

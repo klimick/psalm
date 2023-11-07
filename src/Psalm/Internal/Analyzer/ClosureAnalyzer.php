@@ -9,14 +9,14 @@ use Psalm\Context;
 use Psalm\Internal\Codebase\VariableUseGraph;
 use Psalm\Internal\DataFlow\DataFlowNode;
 use Psalm\Internal\PhpVisitor\ShortClosureVisitor;
+use Psalm\Internal\Type\Comparator\TypeComparisonResult;
 use Psalm\Internal\Type\Comparator\UnionTypeComparator;
+use Psalm\Internal\Type\TypeExpander;
 use Psalm\Issue\DuplicateParam;
 use Psalm\Issue\PossiblyUndefinedVariable;
 use Psalm\Issue\UndefinedVariable;
 use Psalm\IssueBuffer;
 use Psalm\Type;
-use Psalm\Type\Atomic\TCallable;
-use Psalm\Type\Atomic\TClosure;
 use Psalm\Type\Atomic\TMixed;
 use Psalm\Type\Atomic\TNamedObject;
 use Psalm\Type\Union;
@@ -33,6 +33,8 @@ use function strtolower;
  */
 class ClosureAnalyzer extends FunctionLikeAnalyzer
 {
+    public ?Union $possibly_return_type = null;
+
     /**
      * @param PhpParser\Node\Expr\Closure|PhpParser\Node\Expr\ArrowFunction $function
      */
@@ -77,13 +79,6 @@ class ClosureAnalyzer extends FunctionLikeAnalyzer
         Context $context
     ): bool {
         $closure_analyzer = new ClosureAnalyzer($stmt, $statements_analyzer);
-
-        if ($context->inside_return) {
-            self::potentiallyInferTypesOnClosureFromParentReturnType(
-                $statements_analyzer,
-                $closure_analyzer,
-            );
-        }
 
         if ($stmt instanceof PhpParser\Node\Expr\Closure
             && self::analyzeClosureUses($statements_analyzer, $stmt, $context) === false
@@ -215,6 +210,12 @@ class ClosureAnalyzer extends FunctionLikeAnalyzer
 
         $use_context->calling_method_id = $context->calling_method_id;
         $use_context->phantom_classes = $context->phantom_classes;
+
+        $closure_analyzer->possibly_return_type = self::inferParamTypesFromContextualTypeAndGetPossibleReturnType(
+            $context,
+            $statements_analyzer,
+            $closure_analyzer,
+        );
 
         $closure_analyzer->analyze($use_context, $statements_analyzer->node_data, $context, false);
 
@@ -360,82 +361,94 @@ class ClosureAnalyzer extends FunctionLikeAnalyzer
      *
      * @see \Psalm\Tests\ReturnTypeTest:756
      */
-    private static function potentiallyInferTypesOnClosureFromParentReturnType(
+    private static function inferParamTypesFromContextualTypeAndGetPossibleReturnType(
+        Context $context,
         StatementsAnalyzer $statements_analyzer,
         ClosureAnalyzer $closure_analyzer
-    ): void {
-        $parent_source = $statements_analyzer->getSource();
-
-        // if not returning from inside a function, return
-        if (!$parent_source instanceof ClosureAnalyzer && !$parent_source instanceof FunctionAnalyzer) {
-            return;
+    ): ?Union {
+        if (!$context->contextual_type_resolver) {
+            return null;
         }
 
-        $closure_id = $closure_analyzer->getClosureId();
-        $closure_storage = $statements_analyzer
-            ->getCodebase()
-            ->getFunctionLikeStorage($statements_analyzer, $closure_id);
-
-        $parent_fn_storage = $parent_source->getFunctionLikeStorage($statements_analyzer);
-
-        if ($parent_fn_storage->return_type === null) {
-            return;
-        }
-
-        // can't infer returned closure if the parent doesn't have a callable return type
-        if (!$parent_fn_storage->return_type->hasCallableType()) {
-            return;
-        }
-
-        // cannot infer if we have union/intersection types
-        if (!$parent_fn_storage->return_type->isSingle()) {
-            return;
-        }
-
-        /** @var TClosure|TCallable $parent_callable_return_type */
-        $parent_callable_return_type = $parent_fn_storage->return_type->getSingleAtomic();
-
-        if ($parent_callable_return_type->params === null && $parent_callable_return_type->return_type === null) {
-            return;
-        }
-
-        foreach ($closure_storage->params as $key => $param) {
-            $parent_param = $parent_callable_return_type->params[$key] ?? null;
-            $param->type = self::inferInnerClosureTypeFromParent(
-                $statements_analyzer->getCodebase(),
-                $param->type,
-                $parent_param->type ?? null,
-            );
-        }
-
-        $closure_storage->return_type = self::inferInnerClosureTypeFromParent(
-            $statements_analyzer->getCodebase(),
-            $closure_storage->return_type,
-            $parent_callable_return_type->return_type,
+        $contextual_callable_type = ClosureAnalyzerContextualTypeExtractor::extract(
+            $context->contextual_type_resolver,
         );
 
-        if (!$closure_storage->template_types && $parent_callable_return_type->templates) {
-            $closure_storage->template_types = $parent_callable_return_type->getTemplateMap();
+        if ($contextual_callable_type === null) {
+            return null;
         }
+
+        if ($contextual_callable_type->params === null) {
+            return null;
+        }
+
+        $codebase = $statements_analyzer->getCodebase();
+
+        $calling_closure_storage = $codebase->getFunctionLikeStorage(
+            $statements_analyzer,
+            $closure_analyzer->getClosureId(),
+        );
+
+        foreach ($calling_closure_storage->params as $param_index => $calling_param) {
+            $contextual_param_type = $contextual_callable_type->params[$param_index]->type ?? null;
+
+            // No contextual type info. Don't infer.
+            if ($contextual_param_type === null) {
+                continue;
+            }
+
+            // Explicit docblock type. Don't infer.
+            if ($calling_param->type !== $calling_param->signature_type) {
+                continue;
+            }
+
+            $contextual_param_type = self::expandContextualType($codebase, $context, $contextual_param_type);
+            $type_comparison_result = new TypeComparisonResult();
+
+            if ($calling_param->type === null
+                || UnionTypeComparator::isContainedBy(
+                    $codebase,
+                    $contextual_param_type,
+                    $calling_param->type,
+                    false,
+                    false,
+                    $type_comparison_result,
+                )
+            ) {
+                if ($type_comparison_result->to_string_cast) {
+                    continue;
+                }
+
+                $calling_param->type = $contextual_param_type;
+                $calling_param->type_inferred = true;
+            }
+        }
+
+        if (!$calling_closure_storage->template_types && $contextual_callable_type->templates) {
+            $calling_closure_storage->template_types = $contextual_callable_type->getTemplateMap();
+        }
+
+        return $contextual_callable_type->return_type;
     }
 
-    /**
-     * - If non parent type, do nothing
-     * - If no return type, infer from parent
-     * - If parent return type is more specific, infer from parent
-     * - else, do nothing
-     */
-    private static function inferInnerClosureTypeFromParent(
-        Codebase $codebase,
-        ?Union $return_type,
-        ?Union $parent_return_type
-    ): ?Union {
-        if (!$parent_return_type) {
-            return $return_type;
-        }
-        if (!$return_type || UnionTypeComparator::isContainedBy($codebase, $parent_return_type, $return_type)) {
-            return $parent_return_type;
-        }
-        return $return_type;
+    private static function expandContextualType(Codebase $codebase, Context $context, Union $contextual_type): Union
+    {
+        $expand_templates = true;
+        $do_not_expand_template_defined_at = $context->getPossibleTemplateDefiners();
+
+        return TypeExpander::expandUnion(
+            $codebase,
+            $contextual_type,
+            null,
+            null,
+            null,
+            true,
+            false,
+            false,
+            false,
+            $expand_templates,
+            false,
+            $do_not_expand_template_defined_at,
+        );
     }
 }
