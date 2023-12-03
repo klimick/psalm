@@ -49,6 +49,31 @@ class CallableTypeComparator
         Atomic $container_type_part,
         ?TypeComparisonResult $atomic_comparison_result
     ): bool {
+        if ($input_type_part->templates === null && $container_type_part->templates !== null) {
+            // We expect polymorphic callable, but pass monomorphic callable.
+            if ($atomic_comparison_result) {
+                $atomic_comparison_result->type_coerced = true;
+            }
+
+            return false;
+        }
+
+        if ($input_type_part->templates !== null) {
+            if ($container_type_part->templates === null) {
+                // Replace input callable templates by container callable.
+                $input_type_part = $input_type_part->replaceGenericCallableWithContextualType(
+                    $container_type_part,
+                    $codebase,
+                );
+            } else {
+                // Convert both polymorphic callables to generalized representation.
+                // i.e. callable<A, B>(A, B): array{A, B} and callable<X, Y>(X, Y): array{X, Y}
+                // will be transformed to callable<T0, T1>(T0, T1): array{T0, T1}
+                $input_type_part = $input_type_part->toGeneralizedRepresentation($codebase);
+                $container_type_part = $container_type_part->toGeneralizedRepresentation($codebase);
+            }
+        }
+
         if ($container_type_part->is_pure && !$input_type_part->is_pure) {
             if ($atomic_comparison_result) {
                 $atomic_comparison_result->type_coerced = $input_type_part->is_pure === null;
@@ -132,6 +157,24 @@ class CallableTypeComparator
                     return false;
                 }
             }
+        }
+
+        if ($input_type_part->templates !== null
+            && $container_type_part->templates !== null
+        ) {
+            $bounds = [];
+
+            foreach ($input_type_part->templates as $offset => $template) {
+                if (!isset($container_type_part->templates[$offset])) {
+                    continue;
+                }
+
+                $bounds[$template->param_name][$template->defining_class]
+                    = new Type\Union([$container_type_part->templates[$offset]]);
+            }
+
+            $input_type_part = $input_type_part
+                ->replaceTemplateTypesWithArgTypes(new TemplateResult([], $bounds), $codebase);
         }
 
         if (isset($container_type_part->return_type)) {

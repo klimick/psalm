@@ -1324,22 +1324,6 @@ class ClosureTest extends TestCase
                 'ignored_issues' => [],
                 'php_version' => '7.4',
             ],
-            'forbidTemplateAnnotationOnClosure' => [
-                'code' => '<?php
-                    /** @template T */
-                    function (): void {};
-                ',
-                'error_message' => 'InvalidDocblock',
-            ],
-            'forbidTemplateAnnotationOnShortClosure' => [
-                'code' => '<?php
-                    /** @template T */
-                    fn(): bool => false;
-                ',
-                'error_message' => 'InvalidDocblock',
-                'ignored_issues' => [],
-                'php_version' => '7.4',
-            ],
             'closureInvalidArg' => [
                 'code' => '<?php
                     /** @param Closure(int): string $c */

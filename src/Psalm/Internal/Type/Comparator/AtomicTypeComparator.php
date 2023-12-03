@@ -141,6 +141,12 @@ class AtomicTypeComparator
                 && $input_type_part->as->isMixed()
                 && !$input_type_part->extra_types)
         ) {
+            if ($input_type_part instanceof TTemplateParam
+                && $input_type_part->defining_class === 'anonymous-fn'
+            ) {
+                return false;
+            }
+
             if ($atomic_comparison_result) {
                 $atomic_comparison_result->type_coerced = true;
                 $atomic_comparison_result->type_coerced_from_mixed = true;

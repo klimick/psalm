@@ -11,8 +11,10 @@ use Psalm\Storage\FunctionLikeParameter;
 use Psalm\Type\Atomic;
 use Psalm\Type\Union;
 
+use function array_values;
 use function count;
 use function implode;
+use function ksort;
 
 /**
  * @psalm-immutable
@@ -35,7 +37,7 @@ trait CallableTrait
     public $is_pure;
 
     /**
-     * @var ?non-empty-array<TTemplateParam>
+     * @var ?non-empty-list<TTemplateParam>
      */
     public $templates = null;
 
@@ -275,6 +277,116 @@ trait CallableTrait
     }
 
     /**
+     * @param TCallable|TClosure $container_callable
+     * @return static
+     */
+    public function replaceGenericCallableWithContextualType(Atomic $container_callable, Codebase $codebase): Atomic
+    {
+        if ($container_callable->params === null || $this->params === null) {
+            return $this;
+        }
+
+        $input_callable_template_result = new TemplateResult(
+            $this->getTemplateMap(),
+            [],
+        );
+
+        foreach ($container_callable->params as $offset => $container_param) {
+            $input_param = $this->params[$offset] ?? null;
+
+            if ($input_param === null
+                || $input_param->type === null
+                || $container_param->type === null
+            ) {
+                continue;
+            }
+
+            /** @psalm-suppress ImpureMethodCall */
+            TemplateStandinTypeReplacer::fillTemplateResult(
+                $input_param->type,
+                $input_callable_template_result,
+                $codebase,
+                null,
+                $container_param->type,
+            );
+        }
+
+        return $this->replaceTemplateTypesWithArgTypes(
+            $input_callable_template_result,
+            $codebase,
+        );
+    }
+
+    /**
+     * @param TCallable|TClosure $container_callable
+     * @return static
+     */
+    public function fillTemplateResult(
+        Atomic $container_callable,
+        Codebase $codebase,
+        TemplateResult $template_result
+    ): Atomic {
+        if ($container_callable->params === null || $this->params === null) {
+            return $this;
+        }
+
+        foreach ($container_callable->params as $offset => $container_param) {
+            $input_param = $this->params[$offset] ?? null;
+
+            if ($input_param === null || $input_param->type === null || $container_param->type === null) {
+                continue;
+            }
+
+            /** @psalm-suppress ImpureMethodCall */
+            TemplateStandinTypeReplacer::fillTemplateResult(
+                $container_param->type,
+                $template_result,
+                $codebase,
+                null,
+                $input_param->type,
+            );
+        }
+
+        if ($container_callable->return_type !== null) {
+            /** @psalm-suppress ImpureMethodCall */
+            TemplateStandinTypeReplacer::fillTemplateResult(
+                $container_callable->return_type,
+                $template_result,
+                $codebase,
+                null,
+                $this->return_type,
+            );
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return static
+     */
+    public function resolveTemplateCollisions(TemplateResult $template_result, Codebase $codebase): Atomic
+    {
+        $collisions = [];
+
+        foreach ($this->templates ?? [] as $t) {
+            if (!isset($template_result->used_anonymous_template_names[$t->param_name])) {
+                $template_result->used_anonymous_template_names[$t->param_name] = 1;
+                continue;
+            }
+
+            $param_offset = $template_result->used_anonymous_template_names[$t->param_name]++;
+
+            $collisions[$t->param_name][$t->defining_class] = new Union([
+                $t->replaceParamName($t->param_name.$param_offset),
+            ]);
+        }
+
+        return $collisions !== []
+            ? $this->replaceTemplateTypesWithArgTypes(new TemplateResult([], $collisions), $codebase)
+            : $this;
+    }
+
+    /**
      * @return array{list<FunctionLikeParameter>|null, Union|null}|null
      */
     protected function replaceCallableTemplateTypesWithStandins(
@@ -289,6 +401,24 @@ trait CallableTrait
         bool $add_lower_bound = false,
         int $depth = 0
     ): ?array {
+        if (($input_type instanceof TClosure || $input_type instanceof TCallable)
+            && $input_type->templates !== null
+            && $this->templates === null
+        ) {
+            $input_type = null !== $template_result->contextual_template_result
+                ? $input_type->replaceGenericCallableWithContextualType(
+                    $this->replaceTemplateTypesWithArgTypes($template_result->contextual_template_result, $codebase),
+                    $codebase,
+                )
+                : $input_type
+                    ->resolveTemplateCollisions($template_result, $codebase)
+                    ->fillTemplateResult(
+                        $this->replaceTemplateTypesWithArgTypes($template_result, $codebase),
+                        $codebase,
+                        $template_result,
+                    );
+        }
+
         $replaced = false;
         $params = $this->params;
         if ($params) {
@@ -349,9 +479,39 @@ trait CallableTrait
         return null;
     }
 
+    /**
+     * @return static
+     */
+    public function toGeneralizedRepresentation(Codebase $codebase): Atomic
+    {
+        if ($this->templates === null) {
+            return $this;
+        }
+
+        $templates = [];
+
+        foreach ($this->templates as $template) {
+            $templates[$template->param_name] = $template;
+        }
+
+        ksort($templates);
+
+        $offset = 0;
+        $generalized_templates = [];
+
+        foreach ($templates as $template) {
+            $generalized_templates[$template->param_name][$template->defining_class] = new Union([
+                $template->toGeneralized('T'.$offset),
+            ]);
+
+            $offset++;
+        }
+
+        return $this->replaceTemplateTypesWithArgTypes(new TemplateResult([], $generalized_templates), $codebase);
+    }
 
     /**
-     * @return array{list<FunctionLikeParameter>|null, Union|null}|null
+     * @return array{list<FunctionLikeParameter>|null, Union|null, non-empty-list<TTemplateParam>|null}|null
      */
     protected function replaceCallableTemplateTypesWithArgTypes(
         TemplateResult $template_result,
@@ -359,15 +519,43 @@ trait CallableTrait
     ): ?array {
         $replaced = false;
 
+        $templates = [];
         $params = $this->params;
+
         if ($params) {
+            $locally_defined_anon_templates = [];
+
+            foreach ($this->templates ?? [] as $t) {
+                $locally_defined_anon_templates[$t->param_name] = true;
+            }
+
             foreach ($params as $k => $param) {
                 if ($param->type) {
-                    $new_param = $param->setType(TemplateInferredTypeReplacer::replace(
+                    $was_defined_anon_template = $template_result->defined_anon_template;
+                    /** @psalm-suppress ImpurePropertyAssignment */
+                    $template_result->defined_anon_template = $locally_defined_anon_templates;
+
+                    $type = TemplateInferredTypeReplacer::replace(
                         $param->type,
                         $template_result,
                         $codebase,
-                    ));
+                    );
+
+                    /** @psalm-suppress ImpurePropertyAssignment */
+                    $template_result->defined_anon_template = $was_defined_anon_template;
+
+                    foreach ($type->getTemplateTypes() as $t) {
+                        if ($t->defining_class === 'anonymous-fn'
+                            && !isset($template_result->defined_anon_template[$t->param_name])
+                            && !isset($templates[$t->param_name])
+                        ) {
+                            $template_result->defined_anon_template[$t->param_name] = true;
+                            $templates[$t->param_name] = $t;
+                        }
+                    }
+
+                    $new_param = $param->setType($type);
+
                     $replaced = $replaced || $new_param !== $param;
                     $params[$k] = $new_param;
                 }
@@ -375,17 +563,24 @@ trait CallableTrait
         }
 
         $return_type = $this->return_type;
+
         if ($return_type) {
             $return_type = TemplateInferredTypeReplacer::replace(
                 $return_type,
                 $template_result,
                 $codebase,
             );
+
             $replaced = $replaced || $return_type !== $this->return_type;
         }
+
+        /** @psalm-suppress ImpurePropertyAssignment */
+        $template_result->defined_anon_template = [];
+
         if ($replaced) {
-            return [$params, $return_type];
+            return [$params, $return_type, $templates !== [] ? array_values($templates) : null];
         }
+
         return null;
     }
 

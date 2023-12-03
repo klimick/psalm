@@ -960,7 +960,7 @@ final class Context
      */
     public function getPossibleTemplateDefiners(): array
     {
-        $who_can_define_templates = [];
+        $who_can_define_templates = ['anonymous-fn' => true];
 
         if ($this->calling_function_id !== null) {
             $who_can_define_templates['fn-' . $this->calling_function_id] = true;

@@ -1325,7 +1325,7 @@ class ArgumentsAnalyzer
         array $function_params,
         ?FunctionLikeParameter $last_param
     ): ?TemplateResult {
-        $template_types = CallAnalyzer::getTemplateTypesForCall(
+        $templates_for_call = CallAnalyzer::getTemplateTypesForCall(
             $codebase,
             $class_storage,
             $self_fq_class_name,
@@ -1334,15 +1334,22 @@ class ArgumentsAnalyzer
             $class_generic_params,
         );
 
-        if (!$template_types) {
+        if ($templates_for_call === []) {
             return null;
         }
 
-        if (!$template_result) {
-            return new TemplateResult($template_types, []);
+        if ($template_result === null) {
+            return new TemplateResult($templates_for_call, []);
         }
 
-        $template_result->template_types = array_merge($template_result->template_types, $template_types);
+        $template_result->template_types = array_merge(
+            $template_result->template_types,
+            $templates_for_call,
+        );
+
+        $template_result->contextual_template_result = $context->contextual_type_resolver !== null
+            ? $context->contextual_type_resolver->getTemplateResult()
+            : null;
 
         foreach ($args as $argument_offset => $arg) {
             $function_param = null;

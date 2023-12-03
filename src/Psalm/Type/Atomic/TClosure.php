@@ -77,6 +77,8 @@ final class TClosure extends TNamedObject
             $this->is_pure,
             $this->byref_uses,
             $intersection ?? $this->extra_types,
+            false,
+            $replaced[2] ?? null,
         );
     }
 

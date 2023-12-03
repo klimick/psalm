@@ -76,6 +76,8 @@ final class TCallable extends Atomic
             $replaced[0],
             $replaced[1],
             $this->is_pure,
+            false,
+            $replaced[2],
         );
     }
     /**

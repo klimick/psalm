@@ -21,6 +21,7 @@ use Psalm\Internal\Codebase\TaintFlowGraph;
 use Psalm\Internal\DataFlow\TaintSink;
 use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Type\Comparator\CallableTypeComparator;
+use Psalm\Internal\Type\TemplateInferredTypeReplacer;
 use Psalm\Internal\Type\TemplateResult;
 use Psalm\Internal\Type\TypeCombiner;
 use Psalm\Issue\DeprecatedFunction;
@@ -246,7 +247,17 @@ class FunctionCallAnalyzer extends CallAnalyzer
 
         $context->contextual_type_resolver = $was_contextual_resolver;
 
-        if ($function_name instanceof PhpParser\Node\Name && $function_call_info->function_id) {
+        if ($function_call_info->function_storage instanceof FunctionStorage
+            && $function_call_info->function_storage->is_anonymous
+            && $function_call_info->function_storage->template_types !== []
+            && ($stmt_type = $statements_analyzer->node_data->getType($real_stmt))
+        ) {
+            $statements_analyzer->node_data->setType($real_stmt, TemplateInferredTypeReplacer::replace(
+                $stmt_type,
+                $template_result,
+                $codebase,
+            ));
+        } elseif ($function_name instanceof PhpParser\Node\Name && $function_call_info->function_id) {
             $stmt_type = FunctionCallReturnTypeFetcher::fetch(
                 $statements_analyzer,
                 $codebase,
@@ -678,23 +689,22 @@ class FunctionCallAnalyzer extends CallAnalyzer
                 }
 
                 if ($var_type_part instanceof TClosure || $var_type_part instanceof TCallable) {
+                    if (!$function_call_info->function_storage) {
+                        $function_call_info->function_storage = new FunctionStorage();
+                        $function_call_info->function_params = $var_type_part->params;
+                        $function_call_info->function_storage->is_anonymous = true;
+                        $function_call_info->function_storage->return_type = $var_type_part->return_type;
+                        $function_call_info->function_storage->template_types = $var_type_part->templates !== null
+                            ? $var_type_part->getTemplateMap()
+                            : null;
+                    }
+
                     if (!$var_type_part->is_pure) {
-                        if ($context->pure || $context->mutation_free) {
-                            IssueBuffer::maybeAdd(
-                                new ImpureFunctionCall(
-                                    'Cannot call an impure function from a mutation-free context',
-                                    new CodeLocation($statements_analyzer->getSource(), $stmt),
-                                ),
-                                $statements_analyzer->getSuppressedIssues(),
-                            );
-                        }
-
-                        if (!$function_call_info->function_storage) {
-                            $function_call_info->function_storage = new FunctionStorage();
-                        }
-
                         $function_call_info->function_storage->pure = false;
                         $function_call_info->function_storage->mutation_free = false;
+                    } else {
+                        $function_call_info->function_storage->pure = true;
+                        $function_call_info->function_storage->mutation_free = true;
                     }
 
                     $function_call_info->function_params = $var_type_part->params;

@@ -57,4 +57,9 @@ final class ContextualTypeResolver
             $input_type,
         );
     }
+
+    public function getTemplateResult(): TemplateResult
+    {
+        return $this->template_result;
+    }
 }

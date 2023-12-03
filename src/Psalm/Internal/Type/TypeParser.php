@@ -1229,6 +1229,7 @@ class TypeParser
     ) {
         $params = [];
         $templates = [];
+        $anonymous_template_type_map = [];
 
         $generic_tree = null;
 
@@ -1246,28 +1247,38 @@ class TypeParser
                     $child_tree->children[0],
                     $codebase,
                     null,
-                    $template_type_map,
+                    array_merge($template_type_map, $anonymous_template_type_map),
                     $type_aliases,
                     $from_docblock,
                 );
 
-                $templates[] = new TTemplateParam(
+                $template = new TTemplateParam(
                     $child_tree->param_name,
                     $tree_type instanceof Union ? $tree_type : new Union([$tree_type]),
                     'anonymous-fn',
                 );
+
+                $templates[] = $template;
+
+                $anonymous_template_type_map[$template->param_name] = [
+                    $template->defining_class => $template->as,
+                ];
             } elseif ($child_tree instanceof Value) {
-                $templates[] = new TTemplateParam(
+                $template = new TTemplateParam(
                     $child_tree->value,
                     Type::getMixed(),
                     'anonymous-fn',
                 );
+
+                $templates[] = $template;
+
+                $anonymous_template_type_map[$template->param_name] = [
+                    $template->defining_class => $template->as,
+                ];
             } else {
                 throw new TypeParseTreeException('Unable to parse generics of anonymous function');
             }
         }
-
-        $anonymous_template_type_map = [];
 
         foreach ($templates as $template_param) {
             $anonymous_template_type_map[$template_param->param_name] = [

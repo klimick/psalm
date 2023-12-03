@@ -35,6 +35,12 @@ final class TTemplateParam extends Atomic
     public $defining_class;
 
     /**
+     * @var bool
+     * @internal
+     */
+    public $generilized = false;
+
+    /**
      * @param array<string, TNamedObject|TTemplateParam|TIterable|TObjectWithProperties> $extra_types
      */
     public function __construct(
@@ -49,6 +55,28 @@ final class TTemplateParam extends Atomic
         $this->defining_class = $defining_class;
         $this->extra_types = $extra_types;
         parent::__construct($from_docblock);
+    }
+
+    public function replaceParamName(string $param_name): self
+    {
+        if ($this->param_name === $param_name) {
+            return $this;
+        }
+        $cloned = clone $this;
+        $cloned->param_name = $param_name;
+        return $cloned;
+    }
+
+    /**
+     * @internal
+     * @return static
+     */
+    public function toGeneralized(string $param_name): self
+    {
+        $cloned = clone $this;
+        $cloned->param_name = $param_name;
+        $cloned->generilized = true;
+        return $cloned;
     }
 
     /**
