@@ -59,12 +59,18 @@ class MatchAnalyzer
 
         $context->inside_conditional = true;
 
+        $was_contextual_type_resolver = $context->contextual_type_resolver;
+
+        $context->contextual_type_resolver = null;
+
         if (ExpressionAnalyzer::analyze($statements_analyzer, $stmt->cond, $context) === false) {
             $context->inside_conditional = $was_inside_conditional;
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
 
             return false;
         }
 
+        $context->contextual_type_resolver = $was_contextual_type_resolver;
         $context->inside_conditional = $was_inside_conditional;
 
         $switch_var_id = ExpressionIdentifier::getExtendedVarId(
