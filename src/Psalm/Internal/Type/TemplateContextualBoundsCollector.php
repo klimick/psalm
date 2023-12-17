@@ -27,17 +27,29 @@ final class TemplateContextualBoundsCollector
     /** @var array<string, non-empty-array<string, non-empty-list<Atomic>>> */
     private array $collected_atomics = [];
 
-    private function __construct(Codebase $codebase)
+    /** @var array<string, non-empty-array<string, Union>> */
+    private array $template_types;
+
+    /**
+     * @param array<string, non-empty-array<string, Union>> $template_types
+     */
+    private function __construct(Codebase $codebase, array $template_types)
     {
         $this->codebase = $codebase;
+        $this->template_types = $template_types;
     }
 
     /**
+     * @param array<string, non-empty-array<string, Union>> $template_types
      * @return array<string, non-empty-array<string, Union>>
      */
-    public static function collect(Codebase $codebase, Union $contextual_type, Union $return_type): array
-    {
-        $collector = new self($codebase);
+    public static function collect(
+        Codebase $codebase,
+        Union $contextual_type,
+        Union $return_type,
+        array $template_types
+    ): array {
+        $collector = new self($codebase, $template_types);
         $collector->collectUnion($contextual_type, $return_type);
 
         return array_map(
@@ -61,14 +73,7 @@ final class TemplateContextualBoundsCollector
     private function collectAtomic(Atomic $contextual_atomic, Atomic $return_atomic): void
     {
         if ($return_atomic instanceof TTemplateParam) {
-            foreach ($return_atomic->as->getAtomicTypes() as $extends) {
-                self::collectAtomic($contextual_atomic, $extends);
-            }
-
-            $this->collected_atomics
-                [$return_atomic->param_name]
-                [$return_atomic->defining_class]
-                [] = $contextual_atomic;
+            $this->collectTemplateType($contextual_atomic, $return_atomic);
         } elseif ($contextual_atomic instanceof TCallable || $contextual_atomic instanceof TClosure) {
             $this->collectCallable($contextual_atomic, $return_atomic);
         } elseif ($contextual_atomic instanceof TArray || $contextual_atomic instanceof TIterable) {
@@ -77,6 +82,20 @@ final class TemplateContextualBoundsCollector
             $this->collectKeyedArray($contextual_atomic, $return_atomic);
         } elseif ($contextual_atomic instanceof TGenericObject) {
             $this->collectGenericObject($contextual_atomic, $return_atomic);
+        }
+    }
+
+    private function collectTemplateType(Atomic $contextual_atomic, TTemplateParam $return_atomic): void
+    {
+        foreach ($return_atomic->as->getAtomicTypes() as $extends) {
+            self::collectAtomic($contextual_atomic, $extends);
+        }
+
+        $param_name = $return_atomic->param_name;
+        $defining_class = $return_atomic->defining_class;
+
+        if (isset($this->template_types[$param_name][$defining_class])) {
+            $this->collected_atomics[$param_name][$defining_class][] = $contextual_atomic;
         }
     }
 

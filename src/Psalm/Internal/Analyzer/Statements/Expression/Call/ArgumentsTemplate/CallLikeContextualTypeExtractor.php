@@ -62,6 +62,7 @@ final class CallLikeContextualTypeExtractor
                 $codebase,
                 $context->contextual_type_resolver->resolve(),
                 $return_type,
+                $collected_templates->template_types,
             )),
         );
 
