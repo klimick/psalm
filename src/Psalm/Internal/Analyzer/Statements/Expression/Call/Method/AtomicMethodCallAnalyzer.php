@@ -221,14 +221,15 @@ class AtomicMethodCallAnalyzer extends CallAnalyzer
                         true,
                         $context->insideUse(),
                     )) {
-                        $method_storage = $codebase->methods->getStorage($method_identifier);
-
-                        $return_type_candidate = new Union([new TClosure(
-                            'Closure',
-                            $method_storage->params,
-                            $method_storage->return_type,
-                            $method_storage->pure,
-                        )]);
+                        $return_type_candidate = new Union([
+                            $codebase->methods->getStorage($method_identifier)->toAnonymous(
+                                $codebase,
+                                true,
+                                TClosure::class,
+                                $lhs_type_part,
+                                $context->getPossibleTemplateDefiners(),
+                            ),
+                        ]);
                     }
                 }
 

@@ -55,12 +55,18 @@ class MissingMethodCallHandler
             if (isset($class_storage->pseudo_methods[$method_name_lc])) {
                 $result->has_valid_method_call_type = true;
                 $result->existent_method_ids[] = $method_id->__toString();
-                $result->return_type = self::createFirstClassCallableReturnType(
-                    $class_storage->pseudo_methods[$method_name_lc],
-                );
+                $result->return_type = new Union([
+                    $class_storage->pseudo_methods[$method_name_lc]->toAnonymous(
+                        $codebase,
+                        true,
+                        TClosure::class,
+                        $lhs_type_part,
+                        $context->getPossibleTemplateDefiners(),
+                    ),
+                ]);
             } else {
                 $result->non_existent_magic_method_ids[] = $method_id->__toString();
-                $result->return_type = self::createFirstClassCallableReturnType();
+                $result->return_type = Type::getClosure();
             }
 
             return null;
@@ -289,7 +295,15 @@ class MissingMethodCallHandler
             [$pseudo_method_storage, $defining_class_storage] = $found_method_and_class_storage;
 
             if ($stmt->isFirstClassCallable()) {
-                $result->return_type = self::createFirstClassCallableReturnType($pseudo_method_storage);
+                $result->return_type = new Union([
+                    $pseudo_method_storage->toAnonymous(
+                        $codebase,
+                        true,
+                        TClosure::class,
+                        $lhs_type_part,
+                        $context->getPossibleTemplateDefiners(),
+                    ),
+                ]);
                 return;
             }
 
@@ -387,7 +401,7 @@ class MissingMethodCallHandler
 
         if ($stmt->isFirstClassCallable()) {
             $result->non_existent_class_method_ids[] = $method_id->__toString();
-            $result->return_type = self::createFirstClassCallableReturnType();
+            $result->return_type = Type::getClosure();
             return;
         }
 
@@ -422,20 +436,6 @@ class MissingMethodCallHandler
                 $result->non_existent_class_method_ids[] = $intersection_method_id ?: $cased_method_id;
             }
         }
-    }
-
-    private static function createFirstClassCallableReturnType(?MethodStorage $method_storage = null): Union
-    {
-        if ($method_storage) {
-            return new Union([new TClosure(
-                'Closure',
-                $method_storage->params,
-                $method_storage->return_type,
-                $method_storage->pure,
-            )]);
-        }
-
-        return Type::getClosure();
     }
 
     /**

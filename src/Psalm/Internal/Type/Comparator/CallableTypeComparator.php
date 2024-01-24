@@ -6,14 +6,11 @@ use Exception;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\Variable;
 use Psalm\Codebase;
-use Psalm\Internal\Analyzer\Statements\Expression\Call\ClassTemplateParamCollector;
 use Psalm\Internal\Analyzer\StatementsAnalyzer;
 use Psalm\Internal\Codebase\InternalCallMapHandler;
 use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Provider\NodeDataProvider;
 use Psalm\Internal\Type\TemplateResult;
-use Psalm\Internal\Type\TypeExpander;
-use Psalm\Storage\FunctionLikeParameter;
 use Psalm\Type;
 use Psalm\Type\Atomic;
 use Psalm\Type\Atomic\TArray;
@@ -28,7 +25,6 @@ use Psalm\Type\Atomic\TNamedObject;
 use Psalm\Type\Atomic\TTemplateParam;
 use UnexpectedValueException;
 
-use function array_map;
 use function array_slice;
 use function end;
 use function strtolower;
@@ -269,7 +265,7 @@ class CallableTypeComparator
             }
         }
 
-        $input_callable = self::getCallableFromAtomic($codebase, $input_type_part, $container_type_part, null, true);
+        $input_callable = self::getCallableFromAtomic($codebase, $input_type_part, $container_type_part);
 
         if ($input_callable) {
             if (self::isContainedBy(
@@ -305,62 +301,9 @@ class CallableTypeComparator
 
         if ($input_type_part instanceof TLiteralString && $input_type_part->value) {
             try {
-                $function_storage = $codebase->functions->getStorage(
-                    $statements_analyzer,
-                    strtolower($input_type_part->value),
-                );
-
-                if ($expand_callable) {
-                    $params = [];
-
-                    foreach ($function_storage->params as $param) {
-                        if ($param->type) {
-                            $param = $param->setType(
-                                TypeExpander::expandUnion(
-                                    $codebase,
-                                    $param->type,
-                                    null,
-                                    null,
-                                    null,
-                                    true,
-                                    true,
-                                    false,
-                                    false,
-                                    true,
-                                ),
-                            );
-                        }
-
-                        $params[] = $param;
-                    }
-
-                    $return_type = null;
-
-                    if ($function_storage->return_type) {
-                        $return_type = TypeExpander::expandUnion(
-                            $codebase,
-                            $function_storage->return_type,
-                            null,
-                            null,
-                            null,
-                            true,
-                            true,
-                            false,
-                            false,
-                            true,
-                        );
-                    }
-                } else {
-                    $return_type = $function_storage->return_type;
-                    $params = $function_storage->params;
-                }
-
-                return new TCallable(
-                    'callable',
-                    $params,
-                    $return_type,
-                    $function_storage->pure,
-                );
+                return $codebase->functions
+                    ->getStorage($statements_analyzer, strtolower($input_type_part->value))
+                    ->toAnonymous($codebase, $expand_callable, TCallable::class);
             } catch (UnexpectedValueException $e) {
                 if (InternalCallMapHandler::inCallMap($input_type_part->value)) {
                     $args = [];
@@ -390,42 +333,23 @@ class CallableTypeComparator
 
                     $must_use = false;
 
-                    $matching_callable = $matching_callable->setIsPure($codebase->functions->isCallMapFunctionPure(
-                        $codebase,
-                        $statements_analyzer->node_data ?? null,
-                        $input_type_part->value,
-                        null,
-                        $must_use,
-                    ));
-
-                    return $matching_callable;
+                    return $matching_callable
+                        ->setIsPure($codebase->functions->isCallMapFunctionPure(
+                            $codebase,
+                            $statements_analyzer->node_data ?? null,
+                            $input_type_part->value,
+                            null,
+                            $must_use,
+                        ));
                 }
             }
         } elseif ($input_type_part instanceof TKeyedArray) {
             $method_id = self::getCallableMethodIdFromTKeyedArray($input_type_part);
             if ($method_id && $method_id !== 'not-callable') {
                 try {
-                    $method_storage = $codebase->methods->getStorage($method_id);
-                    $method_fqcln = $method_id->fq_class_name;
-
-                    $converted_return_type = null;
-
-                    if ($method_storage->return_type) {
-                        $converted_return_type = TypeExpander::expandUnion(
-                            $codebase,
-                            $method_storage->return_type,
-                            $method_fqcln,
-                            $method_fqcln,
-                            null,
-                        );
-                    }
-
-                    return new TCallable(
-                        'callable',
-                        $method_storage->params,
-                        $converted_return_type,
-                        $method_storage->pure,
-                    );
+                    return $codebase->methods
+                        ->getStorage($codebase->methods->getDeclaringMethodId($method_id) ?? $method_id)
+                        ->toAnonymous($codebase, $expand_callable, TCallable::class);
                 } catch (UnexpectedValueException $e) {
                     // do nothing
                 }
@@ -443,7 +367,8 @@ class CallableTypeComparator
 
     public static function getCallableFromInvokable(
         Codebase $codebase,
-        TNamedObject $input_type_part
+        TNamedObject $input_type_part,
+        bool $expand_callable = false
     ): ?TCallable {
         if (!$codebase->classExists($input_type_part->value)) {
             return null;
@@ -464,51 +389,9 @@ class CallableTypeComparator
             return null;
         }
 
-        $method_storage = $codebase->methods->getStorage($declaring_method_id);
-
-        $callable = new TCallable(
-            'callable',
-            array_map(
-                static fn(FunctionLikeParameter $p) => $p->type !== null
-                    ? $p->setType(TypeExpander::expandUnion(
-                        $codebase,
-                        $p->type,
-                        $invoke_id->fq_class_name,
-                        $invoke_id->fq_class_name,
-                        null,
-                    ))
-                    : $p,
-                $method_storage->params,
-            ),
-            $method_storage->return_type !== null
-                ? TypeExpander::expandUnion(
-                    $codebase,
-                    $method_storage->return_type,
-                    $invoke_id->fq_class_name,
-                    $invoke_id->fq_class_name,
-                    null,
-                )
-                : null,
-            $method_storage->pure,
-        );
-
-        $invokable_storage = $codebase->classlike_storage_provider->get($input_type_part->value);
-
-        $template_result = new TemplateResult(
-            $invokable_storage->template_types ?? [],
-            ClassTemplateParamCollector::collect(
-                $codebase,
-                $invokable_storage,
-                $invokable_storage,
-                '__invoke',
-                $input_type_part,
-            ) ?? [],
-        );
-
-        return $callable->replaceTemplateTypesWithArgTypes(
-            $template_result,
-            $codebase,
-        );
+        return $codebase->methods
+            ->getStorage($declaring_method_id)
+            ->toAnonymous($codebase, $expand_callable, TCallable::class, $input_type_part);
     }
 
     /** @return null|'not-callable'|MethodIdentifier */

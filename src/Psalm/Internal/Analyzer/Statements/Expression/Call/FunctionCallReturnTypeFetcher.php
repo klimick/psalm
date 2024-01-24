@@ -91,6 +91,10 @@ class FunctionCallReturnTypeFetcher
                     $candidate_callable->params,
                     $candidate_callable->return_type,
                     $candidate_callable->is_pure,
+                    [],
+                    [],
+                    false,
+                    $candidate_callable->templates,
                 )]);
             } else {
                 $stmt_type = Type::getClosure();

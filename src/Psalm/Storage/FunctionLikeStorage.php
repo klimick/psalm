@@ -3,15 +3,28 @@
 namespace Psalm\Storage;
 
 use Psalm\CodeLocation;
+use Psalm\Codebase;
 use Psalm\Internal\Analyzer\ClassLikeAnalyzer;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ClassTemplateParamCollector;
+use Psalm\Internal\Type\TemplateBound;
+use Psalm\Internal\Type\TemplateInferredTypeReplacer;
+use Psalm\Internal\Type\TemplateResult;
+use Psalm\Internal\Type\TypeExpander;
 use Psalm\Issue\CodeIssue;
+use Psalm\Type\Atomic;
+use Psalm\Type\Atomic\TCallable;
+use Psalm\Type\Atomic\TClosure;
+use Psalm\Type\Atomic\TNamedObject;
+use Psalm\Type\Atomic\TTemplateParam;
 use Psalm\Type\Union;
 
 use function array_column;
 use function array_fill_keys;
 use function array_map;
+use function array_merge;
 use function count;
 use function implode;
+use function strtolower;
 
 abstract class FunctionLikeStorage implements HasAttributesInterface
 {
@@ -354,5 +367,104 @@ abstract class FunctionLikeStorage implements HasAttributesInterface
     public function getSignature(bool $allow_newlines): string
     {
         return $this->getCompletionSignature();
+    }
+
+    /**
+     * @param TClosure::class|TCallable::class $class
+     * @param array<string, true> $do_not_expand_templates_defining_at
+     * @return ($class is TClosure::class ? TClosure : TCallable)
+     */
+    public function toAnonymous(
+        Codebase $codebase,
+        bool $expand,
+        string $class,
+        Atomic $lhs_type_part = null,
+        array $do_not_expand_templates_defining_at = []
+    ): Atomic {
+        if ($lhs_type_part instanceof TNamedObject
+            && $lhs_type_part->value !== 'Closure'
+            && $this instanceof MethodStorage
+        ) {
+            $class_storage = $codebase->classlike_storage_provider->get($lhs_type_part->value);
+
+            $class_bounds = ClassTemplateParamCollector::collect(
+                $codebase,
+                $class_storage,
+                $class_storage,
+                $this->cased_name !== null
+                    ? strtolower($this->cased_name)
+                    : null,
+                $lhs_type_part,
+            );
+
+            $template_result = new TemplateResult([], $class_bounds ?? []);
+        } else {
+            $template_result = new TemplateResult([], []);
+        }
+
+        $templates = [];
+
+        foreach ($this->template_types ?? [] as $param_name => $type_map) {
+            foreach ($type_map as $defining_class => $extends) {
+                $anonymous = new TTemplateParam(
+                    $param_name,
+                    TemplateInferredTypeReplacer::replace($extends, $template_result, $codebase),
+                    'anonymous-fn',
+                );
+
+                $template_result->lower_bounds[$param_name][$defining_class][] = new TemplateBound(
+                    new Union([$anonymous]),
+                );
+
+                $templates[] = $anonymous;
+            }
+        }
+
+        $callable = $class === TCallable::class
+            ? new TCallable(
+                'callable',
+                $this->params,
+                $this->return_type,
+                $this->pure,
+                false,
+                $templates === [] ? null : $templates,
+            )
+            : new TClosure(
+                'callable',
+                $this->params,
+                $this->return_type,
+                $this->pure,
+                [],
+                [],
+                false,
+                $templates === [] ? null : $templates,
+            );
+
+        $replaced_callable = $callable->replaceTemplateTypesWithArgTypes($template_result, $codebase);
+
+        if (!$expand) {
+            return $replaced_callable;
+        }
+
+        $expanded_callable = TypeExpander::expandUnion(
+            $codebase,
+            new Union([$replaced_callable]),
+            null,
+            null,
+            null,
+            true,
+            false,
+            false,
+            false,
+            true,
+            false,
+            array_merge($do_not_expand_templates_defining_at, ['anonymous-fn' => true]),
+        );
+
+        $expanded_atomic = $expanded_callable->getSingleAtomic();
+
+        return $expanded_atomic instanceof TClosure || $expanded_atomic instanceof TCallable
+            ? $expanded_atomic
+            : $replaced_callable;
     }
 }

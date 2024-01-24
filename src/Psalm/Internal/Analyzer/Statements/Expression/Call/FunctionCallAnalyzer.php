@@ -312,6 +312,10 @@ class FunctionCallAnalyzer extends CallAnalyzer
                             $candidate_callable->params,
                             $candidate_callable->return_type,
                             $candidate_callable->is_pure,
+                            [],
+                            [],
+                            false,
+                            $candidate_callable->templates,
                         );
                     }
                 }

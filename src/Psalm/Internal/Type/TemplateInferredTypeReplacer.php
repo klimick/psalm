@@ -429,31 +429,39 @@ class TemplateInferredTypeReplacer
         $if_type = $atomic_type->if_type;
         $else_type = $atomic_type->else_type;
 
-        if ($template_type === null && $atomic_type->defining_class === 'anonymous-fn') {
+        // Handle first class-callable conditional return.
+        if ($template_type !== null
+            && $atomic_type->defining_class !== 'anonymous-fn'
+            && $template_type->isSingle()
+        ) {
+            $template_atomic = $template_type->getSingleAtomic();
+
+            if ($template_atomic instanceof TTemplateParam
+                && $template_atomic->defining_class === 'anonymous-fn'
+            ) {
+                return new Union([
+                    new TConditional(
+                        $template_atomic->param_name,
+                        $template_atomic->defining_class,
+                        self::replace($as_type, $template_result, $codebase),
+                        self::replace($conditional_type, $template_result, $codebase),
+                        self::replace($if_type, $template_result, $codebase),
+                        self::replace($else_type, $template_result, $codebase),
+                    ),
+                ]);
+            }
+        }
+
+        // Handle anonymous function conditional return.
+        if (($template_type === null && $atomic_type->defining_class === 'anonymous-fn')) {
             return new Union([
                 new TConditional(
                     $atomic_type->param_name,
                     $atomic_type->defining_class,
-                    self::replace(
-                        $atomic_type->as_type,
-                        $template_result,
-                        $codebase,
-                    ),
-                    self::replace(
-                        $atomic_type->conditional_type,
-                        $template_result,
-                        $codebase,
-                    ),
-                    self::replace(
-                        $atomic_type->if_type,
-                        $template_result,
-                        $codebase,
-                    ),
-                    self::replace(
-                        $atomic_type->else_type,
-                        $template_result,
-                        $codebase,
-                    ),
+                    self::replace($as_type, $template_result, $codebase),
+                    self::replace($conditional_type, $template_result, $codebase),
+                    self::replace($if_type, $template_result, $codebase),
+                    self::replace($else_type, $template_result, $codebase),
                 ),
             ]);
         }
