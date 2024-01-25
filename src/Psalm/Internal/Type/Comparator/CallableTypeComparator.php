@@ -3,6 +3,7 @@
 namespace Psalm\Internal\Type\Comparator;
 
 use Exception;
+use InvalidArgumentException;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\Variable;
 use Psalm\Codebase;
@@ -350,7 +351,7 @@ class CallableTypeComparator
                     return $codebase->methods
                         ->getStorage($codebase->methods->getDeclaringMethodId($method_id) ?? $method_id)
                         ->toAnonymous($codebase, $expand_callable, TCallable::class);
-                } catch (UnexpectedValueException $e) {
+                } catch (UnexpectedValueException | InvalidArgumentException $e) {
                     // do nothing
                 }
             }

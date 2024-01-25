@@ -2331,7 +2331,8 @@ class ClassTemplateTest extends TestCase
             'templateStaticWithParam' => [
                 'code' => '<?php
                     /**
-                     * @template T
+                     * @template-covariant T
+                     * @psalm-immutable
                      * @psalm-consistent-constructor
                      * @psalm-consistent-templates
                      */
@@ -2352,20 +2353,22 @@ class ClassTemplateTest extends TestCase
                          * @return static<U>
                          */
                         public function map(callable $callback) {
-                            /** @psalm-suppress RedundantFunctionCall */
-                            return new static(array_values(array_map($callback, $this->elements)));
+                            /** @psalm-suppress ImpureFunctionCall */
+                            return new static(array_map($callback, $this->elements));
                         }
                     }
 
-                    /** @param ArrayCollection<int> $ints */
-                    function takesInts(ArrayCollection $ints) :void {}
+                    /** @param ArrayCollection<int> $_ints */
+                    function takesInts(ArrayCollection $_ints) :void {}
 
-                    /** @param ArrayCollection<int|string> $ints */
-                    function takesIntsOrStrings(ArrayCollection $ints) :void {}
+                    /** @param ArrayCollection<int|string> $_intsOrStrings */
+                    function takesIntsOrStrings(ArrayCollection $_intsOrStrings) :void {}
 
-                    takesInts((new ArrayCollection([ "a", "bc" ]))->map("strlen"));
+                    takesInts((new ArrayCollection(["a", "bc"]))->map("strlen"));
 
-                    /** @return ($s is "string" ? string : int) */
+                    /**
+                     * @return ($s is "string" ? string : int)
+                     */
                     function foo(string $s) {
                         if ($s === "string") {
                             return "hello";
@@ -2373,11 +2376,12 @@ class ClassTemplateTest extends TestCase
                         return 5;
                     }
 
-                    takesIntsOrStrings((new ArrayCollection([ "a", "bc" ]))->map("foo"));
+                    takesIntsOrStrings((new ArrayCollection(["a", "bc"]))->map("foo"));
 
                     /**
-                     * @template T
+                     * @template-covariant T
                      * @extends ArrayCollection<T>
+                     * @psalm-immutable
                      */
                     class LazyArrayCollection extends ArrayCollection {}',
             ],
