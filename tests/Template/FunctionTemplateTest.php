@@ -1200,7 +1200,7 @@ class FunctionTemplateTest extends TestCase
                         useFooAndBar(decorateWithFoo(decorateWithBar($input)));
                     }',
             ],
-            'SKIPPED-dueGenericAnon-bottomTypeInClosureShouldNotBind' => [
+            'bottomTypeInClosureShouldNotBind' => [
                 'code' => '<?php
                     /**
                      * @template T
@@ -1423,7 +1423,7 @@ class FunctionTemplateTest extends TestCase
                         })();
                     }',
             ],
-            'SKIPPED-dueGenericAnon-allowClosureParamLowerBoundAndUpperBound' => [
+            'allowClosureParamLowerBoundAndUpperBound' => [
                 'code' => '<?php
                     class Foo {}
 

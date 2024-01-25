@@ -2481,7 +2481,7 @@ class ClassTemplateTest extends TestCase
                         }
                     }',
             ],
-            'SKIPPED-dueGenericAnon-intersectOnTOfObject' => [
+            'intersectOnTOfObject' => [
                 'code' => '<?php
                     /**
                      * @psalm-template TO of object
