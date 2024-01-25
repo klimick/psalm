@@ -67,7 +67,7 @@ final class TClosure extends TNamedObject
     ): self {
         $replaced = $this->replaceCallableTemplateTypesWithArgTypes($template_result, $codebase);
         $intersection = $this->replaceIntersectionTemplateTypesWithArgTypes($template_result, $codebase);
-        if ($replaced === null && $intersection === null) {
+        if (!$replaced && !$intersection) {
             return $this;
         }
         return new static(

@@ -209,7 +209,7 @@ class TNamedObject extends Atomic
         ?Codebase $codebase
     ): self {
         $intersection = $this->replaceIntersectionTemplateTypesWithArgTypes($template_result, $codebase);
-        if ($intersection === null) {
+        if (!$intersection) {
             return $this;
         }
         $cloned = clone $this;

@@ -294,7 +294,7 @@ final class TObjectWithProperties extends TObject
             $template_result,
             $codebase,
         );
-        if ($properties === $this->properties && $intersection === null) {
+        if ($properties === $this->properties && !$intersection) {
             return $this;
         }
         return new static(
