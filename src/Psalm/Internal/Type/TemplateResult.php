@@ -64,6 +64,11 @@ class TemplateResult
     public array $defined_anon_template = [];
 
     /**
+     * @var array<string, true>
+     */
+    public array $collisions_resolved_at = [];
+
+    /**
      * @param  array<string, array<string, Union>> $template_types
      * @param  array<string, array<string, Union>> $lower_bounds
      */

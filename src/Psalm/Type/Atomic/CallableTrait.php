@@ -321,7 +321,7 @@ trait CallableTrait
      * @param TCallable|TClosure $container_callable
      * @return static
      */
-    public function fillTemplateResult(
+    public function promoteAnonymousTemplates(
         Atomic $container_callable,
         Codebase $codebase,
         TemplateResult $template_result
@@ -347,34 +347,53 @@ trait CallableTrait
             );
         }
 
-        if ($container_callable->return_type !== null) {
-            /** @psalm-suppress ImpureMethodCall */
-            TemplateStandinTypeReplacer::fillTemplateResult(
-                $container_callable->return_type,
-                $template_result,
-                $codebase,
-                null,
-                $this->return_type,
-            );
-        }
-
         return $this;
     }
 
     /**
      * @return static
      */
-    public function resolveTemplateCollisions(TemplateResult $template_result, Codebase $codebase): Atomic
+    public function resolveAnonymousTemplateCollisions(Codebase $codebase, TemplateResult $template_result): Atomic
     {
+        $input_type_map = $this->getTemplateMap();
+        $incremented = [];
+
+        foreach ($template_result->lower_bounds as $param_name => $type_map) {
+            foreach ($type_map as $defining_at => $bounds) {
+                if (isset($template_result->collisions_resolved_at["{$param_name}-{$defining_at}"])) {
+                    continue;
+                }
+
+                foreach ($bounds as $bound) {
+                    foreach ($bound->type->getTemplateTypes() as $template) {
+                        if (!isset($input_type_map[$template->param_name]['anonymous-fn'])) {
+                            continue;
+                        }
+
+                        if (isset($incremented[$template->param_name])) {
+                            continue;
+                        }
+
+                        $param_offset = isset($template_result->used_anonymous_template_names[$template->param_name])
+                            ? $template_result->used_anonymous_template_names[$template->param_name] + 1
+                            : 1;
+
+                        $template_result->used_anonymous_template_names[$template->param_name] = $param_offset;
+                        $template_result->collisions_resolved_at["{$param_name}-{$defining_at}"] = true;
+                        $incremented[$template->param_name] = true;
+                    }
+                }
+            }
+        }
+
         $collisions = [];
 
         foreach ($this->templates ?? [] as $t) {
             if (!isset($template_result->used_anonymous_template_names[$t->param_name])) {
-                $template_result->used_anonymous_template_names[$t->param_name] = 1;
                 continue;
             }
 
-            $param_offset = $template_result->used_anonymous_template_names[$t->param_name]++;
+            $param_offset = $template_result->used_anonymous_template_names[$t->param_name];
 
             $collisions[$t->param_name][$t->defining_class] = new Union([
                 $t->replaceParamName($t->param_name.$param_offset),
@@ -405,18 +424,19 @@ trait CallableTrait
             && $input_type->templates !== null
             && $this->templates === null
         ) {
-            $input_type = null !== $template_result->contextual_template_result
-                ? $input_type->replaceGenericCallableWithContextualType(
+            if ($template_result->contextual_template_result === null) {
+                $replaced_container = $this->replaceTemplateTypesWithArgTypes($template_result, $codebase);
+
+                $input_type = $input_type
+                    ->resolveAnonymousTemplateCollisions($codebase, $template_result)
+                    ->promoteAnonymousTemplates($replaced_container, $codebase, $template_result)
+                    ->replaceGenericCallableWithContextualType($replaced_container, $codebase);
+            } else {
+                $input_type = $input_type->replaceGenericCallableWithContextualType(
                     $this->replaceTemplateTypesWithArgTypes($template_result->contextual_template_result, $codebase),
                     $codebase,
-                )
-                : $input_type
-                    ->resolveTemplateCollisions($template_result, $codebase)
-                    ->fillTemplateResult(
-                        $this->replaceTemplateTypesWithArgTypes($template_result, $codebase),
-                        $codebase,
-                        $template_result,
-                    );
+                );
+            }
         }
 
         $replaced = false;
