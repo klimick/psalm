@@ -59,13 +59,19 @@ class MethodCallAnalyzer extends CallAnalyzer
             $existing_stmt_var_type = $statements_analyzer->node_data->getType($stmt->var);
         }
 
+        $was_contextual_resolver = $context->contextual_type_resolver;
+        $context->contextual_type_resolver = null;
+
         if ($existing_stmt_var_type) {
             $statements_analyzer->node_data->setType($stmt->var, $existing_stmt_var_type);
         } elseif (ExpressionAnalyzer::analyze($statements_analyzer, $stmt->var, $context) === false) {
             $context->inside_call = $was_inside_call;
+            $context->contextual_type_resolver = $was_contextual_resolver;
 
             return false;
         }
+
+        $context->contextual_type_resolver = $was_contextual_resolver;
 
         if (!$stmt->name instanceof PhpParser\Node\Identifier) {
             $context->inside_call = true;
