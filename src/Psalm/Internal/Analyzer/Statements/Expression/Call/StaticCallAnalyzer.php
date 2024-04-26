@@ -176,10 +176,13 @@ class StaticCallAnalyzer extends CallAnalyzer
                 $lhs_type = new Union([new TNamedObject($fq_class_name)]);
             }
         } else {
+            $was_contextual_type_resolver = $context->contextual_type_resolver;
+            $context->contextual_type_resolver = null;
             $was_inside_general_use = $context->inside_general_use;
             $context->inside_general_use = true;
             ExpressionAnalyzer::analyze($statements_analyzer, $stmt->class, $context);
             $context->inside_general_use = $was_inside_general_use;
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
             $lhs_type = $statements_analyzer->node_data->getType($stmt->class) ?? Type::getMixed();
         }
 
