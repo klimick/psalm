@@ -75,7 +75,7 @@ final class CallLikeContextualTypeExtractor
 
     private static function getReturnTypeFromDeclaringConstructor(
         Codebase $codebase,
-        FunctionLikeStorage $ctor_storage
+        FunctionLikeStorage $ctor_storage,
     ): ?Union {
         if ($ctor_storage instanceof MethodStorage
             && $ctor_storage->cased_name === '__construct'
