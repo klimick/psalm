@@ -80,7 +80,6 @@ final class ExpressionAnalyzer
         bool $array_assignment = false,
         ?Context $global_context = null,
         PhpParser\Node\Stmt $from_stmt = null,
-        ?TemplateResult $template_result = null,
         bool $assigned_to_reference = false,
     ): bool {
         if (self::dispatchBeforeExpressionAnalysis($stmt, $context, $statements_analyzer) === false) {
@@ -96,7 +95,6 @@ final class ExpressionAnalyzer
             $array_assignment,
             $global_context,
             $from_stmt,
-            $template_result,
             $assigned_to_reference,
         ) === false) {
             return false;
@@ -135,6 +133,14 @@ final class ExpressionAnalyzer
 
         if (self::dispatchAfterExpressionAnalysis($stmt, $context, $statements_analyzer) === false) {
             return false;
+        }
+
+        if ($context->contextual_type_resolver !== null) {
+            $inferred_type = $statements_analyzer->node_data->getType($stmt);
+
+            if ($inferred_type !== null) {
+                $context->contextual_type_resolver->fillTemplateResult($inferred_type);
+            }
         }
 
         return true;
@@ -185,7 +191,6 @@ final class ExpressionAnalyzer
         bool $array_assignment,
         ?Context $global_context,
         ?PhpParser\Node\Stmt $from_stmt,
-        ?TemplateResult $template_result = null,
         bool $assigned_to_reference = false,
     ): bool {
         if ($stmt instanceof PhpParser\Node\Expr\Variable) {
@@ -210,11 +215,11 @@ final class ExpressionAnalyzer
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\MethodCall) {
-            return MethodCallAnalyzer::analyze($statements_analyzer, $stmt, $context, true, $template_result);
+            return MethodCallAnalyzer::analyze($statements_analyzer, $stmt, $context);
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\StaticCall) {
-            return StaticCallAnalyzer::analyze($statements_analyzer, $stmt, $context, $template_result);
+            return StaticCallAnalyzer::analyze($statements_analyzer, $stmt, $context);
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\ConstFetch) {
@@ -303,7 +308,7 @@ final class ExpressionAnalyzer
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\New_) {
-            return NewAnalyzer::analyze($statements_analyzer, $stmt, $context, $template_result);
+            return NewAnalyzer::analyze($statements_analyzer, $stmt, $context);
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\Array_) {
@@ -319,7 +324,6 @@ final class ExpressionAnalyzer
                 $statements_analyzer,
                 $stmt,
                 $context,
-                $template_result,
             );
         }
 
@@ -421,7 +425,6 @@ final class ExpressionAnalyzer
                 $array_assignment,
                 $global_context,
                 $from_stmt,
-                $template_result,
                 $assigned_to_reference,
             );
         }

@@ -234,17 +234,6 @@ final class TemplateStandinTypeReplacer
             );
         }
 
-        if ($atomic_type instanceof TTemplateParam
-            && isset($template_result->lower_bounds[$atomic_type->param_name][$atomic_type->defining_class])
-        ) {
-            $most_specific_type = self::getMostSpecificTypeFromBounds(
-                $template_result->lower_bounds[$atomic_type->param_name][$atomic_type->defining_class],
-                $codebase,
-            );
-
-            return array_values($most_specific_type->getAtomicTypes());
-        }
-
         if ($atomic_type instanceof TTemplateParamClass
             && isset($template_result->template_types[$atomic_type->param_name][$atomic_type->defining_class])
         ) {
@@ -273,14 +262,12 @@ final class TemplateStandinTypeReplacer
 
                 $include_first = true;
 
-                if (isset($template_result->lower_bounds[$atomic_type->array_param_name][$atomic_type->defining_class])
+                if (isset($template_result->template_types[$atomic_type->array_param_name][$atomic_type->defining_class])
                     && !empty($template_result->lower_bounds[$atomic_type->offset_param_name])
                 ) {
                     $array_template_type
-                        = self::getMostSpecificTypeFromBounds(
-                            $template_result->lower_bounds[$atomic_type->array_param_name][$atomic_type->defining_class],
-                            $codebase,
-                        );
+                        = $template_result->template_types[$atomic_type->array_param_name][$atomic_type->defining_class];
+
                     $offset_template_type
                         = self::getMostSpecificTypeFromBounds(
                             array_values($template_result->lower_bounds[$atomic_type->offset_param_name])[0],
@@ -332,18 +319,10 @@ final class TemplateStandinTypeReplacer
             $atomic_types = [];
 
             $include_first = true;
-            $template_type = null;
 
-            if (isset($template_result->lower_bounds[$atomic_type->param_name][$atomic_type->defining_class])) {
-                $template_type = self::getMostSpecificTypeFromBounds(
-                    $template_result->lower_bounds[$atomic_type->param_name][$atomic_type->defining_class],
-                    $codebase,
-                );
-            } elseif (isset($template_result->template_types[$atomic_type->param_name][$atomic_type->defining_class])) {
+            if (isset($template_result->template_types[$atomic_type->param_name][$atomic_type->defining_class])) {
                 $template_type = $template_result->template_types[$atomic_type->param_name][$atomic_type->defining_class];
-            }
 
-            if ($template_type) {
                 foreach ($template_type->getAtomicTypes() as $template_atomic) {
                     if (!$template_atomic instanceof TKeyedArray
                         && !$template_atomic instanceof TArray
@@ -772,16 +751,6 @@ final class TemplateStandinTypeReplacer
                             $existing_lower_bound = reset($template_result->lower_bounds[$atomic_type->param_name][$atomic_type->defining_class]);
 
                             $existing_lower_bound->type = $key_type;
-                        }
-                    }
-
-                    if ($replacement_atomic_type instanceof TTemplateParam
-                        && $replacement_atomic_type->defining_class !== $calling_class
-                        && $replacement_atomic_type->defining_class !== 'fn-' . $calling_function
-                    ) {
-                        foreach ($replacement_atomic_type->as->getAtomicTypes() as $nested_type_atomic) {
-                            $replacements_found = true;
-                            $atomic_types[] = $nested_type_atomic;
                         }
                     }
                     // @codingStandardsIgnoreEnd

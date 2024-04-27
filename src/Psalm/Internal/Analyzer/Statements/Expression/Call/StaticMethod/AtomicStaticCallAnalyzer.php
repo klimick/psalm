@@ -55,6 +55,7 @@ use Psalm\Type\Atomic\TTemplateParam;
 use Psalm\Type\Union;
 
 use function array_filter;
+use function array_map;
 use function array_values;
 use function assert;
 use function count;
@@ -75,7 +76,6 @@ final class AtomicStaticCallAnalyzer
         bool &$moved_call,
         bool &$has_mock,
         bool &$has_existing_method,
-        ?TemplateResult $inferred_template_result = null,
     ): void {
         $intersection_types = [];
 
@@ -211,7 +211,6 @@ final class AtomicStaticCallAnalyzer
                 $fq_class_name,
                 $moved_call,
                 $has_existing_method,
-                $inferred_template_result,
             );
         } else {
             if ($stmt->name instanceof PhpParser\Node\Expr) {
@@ -310,7 +309,6 @@ final class AtomicStaticCallAnalyzer
         string $fq_class_name,
         bool &$moved_call,
         bool &$has_existing_method,
-        ?TemplateResult $inferred_template_result = null,
     ): bool {
         $codebase = $statements_analyzer->getCodebase();
 
@@ -877,7 +875,6 @@ final class AtomicStaticCallAnalyzer
             $cased_method_id,
             $class_storage,
             $moved_call,
-            $inferred_template_result,
         );
 
         return true;

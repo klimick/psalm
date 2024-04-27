@@ -326,6 +326,11 @@ final class Context
      */
     public array $parent_remove_vars = [];
 
+    /**
+     * @var ContextualTypeResolver|null
+     */
+    public $contextual_type_resolver = null;
+
     /** @internal */
     public function __construct(
         /**
@@ -854,5 +859,29 @@ final class Context
             || $this->inside_conditional
             || $this->inside_throw
             || $this->inside_isset;
+    }
+
+    /**
+     * Returns all possible template definers in context (class, function or method).
+     *
+     * @return array<string, true>
+     */
+    public function getPossibleTemplateDefiners(): array
+    {
+        $who_can_define_templates = ['anonymous-fn' => true];
+
+        if ($this->calling_function_id !== null) {
+            $who_can_define_templates['fn-' . $this->calling_function_id] = true;
+        }
+
+        if ($this->calling_method_id !== null) {
+            $who_can_define_templates['fn-' . $this->calling_method_id] = true;
+        }
+
+        if ($this->self !== null) {
+            $who_can_define_templates[$this->self] = true;
+        }
+
+        return $who_can_define_templates;
     }
 }

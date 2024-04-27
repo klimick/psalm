@@ -50,6 +50,9 @@ final class TernaryAnalyzer
 
         $if_scope = new IfScope();
 
+        $was_contextual_type_resolver = $context->contextual_type_resolver;
+        $context->contextual_type_resolver = null;
+
         try {
             $if_conditional_scope = IfConditionalAnalyzer::analyze(
                 $statements_analyzer,
@@ -62,12 +65,17 @@ final class TernaryAnalyzer
 
             // this is the context for stuff that happens within the first operand of the ternary
             $if_context = $if_conditional_scope->if_context;
+            $if_context->contextual_type_resolver = $was_contextual_type_resolver;
 
             $cond_referenced_var_ids = $if_conditional_scope->cond_referenced_var_ids;
             $assigned_in_conditional_var_ids = $if_conditional_scope->assigned_in_conditional_var_ids;
         } catch (ScopeAnalysisException) {
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
+
             return false;
         }
+
+        $context->contextual_type_resolver = $was_contextual_type_resolver;
 
         $cond_object_id = spl_object_id($stmt->cond);
 

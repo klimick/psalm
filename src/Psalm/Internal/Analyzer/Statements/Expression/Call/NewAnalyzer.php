@@ -14,6 +14,8 @@ use Psalm\Internal\Analyzer\ClassLikeAnalyzer;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
 use Psalm\Internal\Analyzer\NamespaceAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\Method\MethodCallReturnTypeFetcher;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\Method\MethodVisibilityAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\ExpressionAnalyzer;
@@ -78,7 +80,6 @@ final class NewAnalyzer extends CallAnalyzer
         StatementsAnalyzer $statements_analyzer,
         PhpParser\Node\Expr\New_ $stmt,
         Context $context,
-        TemplateResult $template_result = null,
     ): bool {
         $fq_class_name = null;
 
@@ -275,7 +276,6 @@ final class NewAnalyzer extends CallAnalyzer
                     $fq_class_name,
                     $from_static,
                     $can_extend,
-                    $template_result,
                 );
             } else {
                 ArgumentsAnalyzer::analyze(
@@ -312,7 +312,6 @@ final class NewAnalyzer extends CallAnalyzer
         string $fq_class_name,
         bool $from_static,
         bool $can_extend,
-        TemplateResult $template_result = null,
     ): void {
         $storage = $codebase->classlike_storage_provider->get($fq_class_name);
 
@@ -413,7 +412,31 @@ final class NewAnalyzer extends CallAnalyzer
                 );
             }
 
-            $template_result ??= new TemplateResult([], []);
+            $declaring_method_id = $codebase->methods->getDeclaringMethodId($method_id);
+
+            $method_storage = $declaring_method_id !== null
+                ? $codebase->methods->getStorage($declaring_method_id)
+                : null;
+
+            $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
+                $stmt,
+                $context,
+                $statements_analyzer,
+                $method_storage,
+            );
+
+            $was_contextual_type_resolver = $context->contextual_type_resolver;
+            $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
+                $context,
+                $codebase,
+                $method_storage,
+                $collected_argument_templates,
+            );
+
+            $template_result = new TemplateResult(
+                $collected_argument_templates->template_types,
+                $collected_argument_templates->lower_bounds,
+            );
 
             if (self::checkMethodArgs(
                 $method_id,
@@ -423,8 +446,12 @@ final class NewAnalyzer extends CallAnalyzer
                 new CodeLocation($statements_analyzer->getSource(), $stmt),
                 $statements_analyzer,
             ) === false) {
+                $context->contextual_type_resolver = $was_contextual_type_resolver;
+
                 return;
             }
+
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
 
             if (MethodVisibilityAnalyzer::analyze(
                 $method_id,

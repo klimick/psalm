@@ -55,6 +55,7 @@ final class TypeExpander
 {
     /**
      * @psalm-suppress InaccessibleProperty We just created the type
+     * @param array<string, true> $do_not_expand_template_defined_at
      */
     public static function expandUnion(
         Codebase $codebase,
@@ -68,6 +69,7 @@ final class TypeExpander
         bool $expand_generic = false,
         bool $expand_templates = false,
         bool $throw_on_unresolvable_constant = false,
+        array $do_not_expand_template_defined_at = [],
     ): Union {
         $new_return_type_parts = [];
 
@@ -84,6 +86,7 @@ final class TypeExpander
                 $expand_generic,
                 $expand_templates,
                 $throw_on_unresolvable_constant,
+                $do_not_expand_template_defined_at,
             );
 
             $new_return_type_parts = [...$new_return_type_parts, ...$parts];
@@ -112,6 +115,7 @@ final class TypeExpander
 
     /**
      * @param-out Atomic $return_type
+     * @param array<string, true> $do_not_expand_template_defined_at
      * @return non-empty-list<Atomic>
      * @psalm-suppress ConflictingReferenceConstraint, ReferenceConstraintViolation The output type is always Atomic
      * @psalm-suppress ComplexMethod
@@ -128,6 +132,7 @@ final class TypeExpander
         bool $expand_generic = false,
         bool $expand_templates = false,
         bool $throw_on_unresolvable_constant = false,
+        array $do_not_expand_template_defined_at = [],
     ): array {
         if ($return_type instanceof TEnumCase) {
             return [$return_type];
@@ -149,9 +154,11 @@ final class TypeExpander
                         $parent_class,
                         $evaluate_class_constants,
                         $evaluate_conditional_types,
+                        $final,
                         $expand_generic,
                         $expand_templates,
                         $throw_on_unresolvable_constant,
+                        $do_not_expand_template_defined_at,
                     );
 
                     if ($extra_type instanceof TNamedObject && $extra_type->extra_types) {
@@ -195,6 +202,7 @@ final class TypeExpander
                 $expand_generic,
                 $expand_templates,
                 $throw_on_unresolvable_constant,
+                $do_not_expand_template_defined_at,
             );
 
             if ($new_as_type instanceof TNamedObject && $new_as_type !== $return_type->as_type) {
@@ -203,7 +211,9 @@ final class TypeExpander
                     $new_as_type,
                 );
             }
-        } elseif ($return_type instanceof TTemplateParam) {
+        } elseif ($return_type instanceof TTemplateParam
+            && !isset($do_not_expand_template_defined_at[$return_type->defining_class])
+        ) {
             $new_as_type = self::expandUnion(
                 $codebase,
                 $return_type->as,
@@ -216,6 +226,7 @@ final class TypeExpander
                 $expand_generic,
                 $expand_templates,
                 $throw_on_unresolvable_constant,
+                $do_not_expand_template_defined_at,
             );
 
             if ($expand_templates) {
@@ -313,6 +324,7 @@ final class TypeExpander
                     $expand_generic,
                     $expand_templates,
                     $throw_on_unresolvable_constant,
+                    $do_not_expand_template_defined_at,
                 );
 
                 $recursively_fleshed_out_types = [
@@ -339,6 +351,7 @@ final class TypeExpander
                 $expand_generic,
                 $expand_templates,
                 $throw_on_unresolvable_constant,
+                $do_not_expand_template_defined_at,
             );
         }
 
@@ -362,6 +375,7 @@ final class TypeExpander
                     $expand_generic,
                     $expand_templates,
                     $throw_on_unresolvable_constant,
+                    $do_not_expand_template_defined_at,
                 );
 
                 $new_value_type = reset($new_value_type);
@@ -395,6 +409,7 @@ final class TypeExpander
                 $expand_generic,
                 $expand_templates,
                 $throw_on_unresolvable_constant,
+                $do_not_expand_template_defined_at,
             );
 
             $potential_ints = [];
@@ -423,6 +438,7 @@ final class TypeExpander
                 $expand_generic,
                 $expand_templates,
                 $throw_on_unresolvable_constant,
+                $do_not_expand_template_defined_at,
             );
         }
 
@@ -445,6 +461,7 @@ final class TypeExpander
                     $expand_generic,
                     $expand_templates,
                     $throw_on_unresolvable_constant,
+                    $do_not_expand_template_defined_at,
                 );
             }
             unset($type_param);
@@ -466,6 +483,7 @@ final class TypeExpander
                     $expand_generic,
                     $expand_templates,
                     $throw_on_unresolvable_constant,
+                    $do_not_expand_template_defined_at,
                 );
                 if ($property_type !== $properties[$k]) {
                     $changed = true;
@@ -488,6 +506,7 @@ final class TypeExpander
                         $expand_generic,
                         $expand_templates,
                         $throw_on_unresolvable_constant,
+                        $do_not_expand_template_defined_at,
                     );
                     if ($property_type !== $fallback_params[$k]) {
                         $changed = true;
@@ -522,6 +541,7 @@ final class TypeExpander
                     $expand_generic,
                     $expand_templates,
                     $throw_on_unresolvable_constant,
+                    $do_not_expand_template_defined_at,
                 );
             }
             unset($property_type);
@@ -547,6 +567,7 @@ final class TypeExpander
                             $expand_generic,
                             $expand_templates,
                             $throw_on_unresolvable_constant,
+                            $do_not_expand_template_defined_at,
                         ));
                     }
                 }
@@ -566,6 +587,7 @@ final class TypeExpander
                     $expand_generic,
                     $expand_templates,
                     $throw_on_unresolvable_constant,
+                    $do_not_expand_template_defined_at,
                 );
             }
 
@@ -691,6 +713,7 @@ final class TypeExpander
     }
 
     /**
+     * @param array<string, true> $do_not_expand_template_defined_at
      * @return non-empty-list<Atomic>
      */
     private static function expandConditional(
@@ -705,6 +728,7 @@ final class TypeExpander
         bool $expand_generic = false,
         bool $expand_templates = false,
         bool $throw_on_unresolvable_constant = false,
+        array $do_not_expand_template_defined_at = [],
     ): array {
         $new_as_type = self::expandUnion(
             $codebase,
@@ -718,6 +742,7 @@ final class TypeExpander
             $expand_generic,
             $expand_templates,
             $throw_on_unresolvable_constant,
+            $do_not_expand_template_defined_at,
         );
 
         if ($evaluate_conditional_types) {
@@ -737,6 +762,7 @@ final class TypeExpander
                         $expand_generic,
                         $expand_templates,
                         $throw_on_unresolvable_constant,
+                        $do_not_expand_template_defined_at,
                     );
 
                     if (count($candidate) === 1) {
@@ -760,6 +786,7 @@ final class TypeExpander
                     $expand_generic,
                     $expand_templates,
                     $throw_on_unresolvable_constant,
+                    $do_not_expand_template_defined_at,
                 );
 
                 $if_conditional_return_types = [...$if_conditional_return_types, ...$candidate_types];
@@ -780,6 +807,7 @@ final class TypeExpander
                     $expand_generic,
                     $expand_templates,
                     $throw_on_unresolvable_constant,
+                    $do_not_expand_template_defined_at,
                 );
 
                 $else_conditional_return_types = [...$else_conditional_return_types, ...$candidate_types];
@@ -870,6 +898,7 @@ final class TypeExpander
                 $expand_generic,
                 $expand_templates,
                 $throw_on_unresolvable_constant,
+                $do_not_expand_template_defined_at,
             ),
             self::expandUnion(
                 $codebase,
@@ -883,6 +912,7 @@ final class TypeExpander
                 $expand_generic,
                 $expand_templates,
                 $throw_on_unresolvable_constant,
+                $do_not_expand_template_defined_at,
             ),
             self::expandUnion(
                 $codebase,
@@ -896,6 +926,7 @@ final class TypeExpander
                 $expand_generic,
                 $expand_templates,
                 $throw_on_unresolvable_constant,
+                $do_not_expand_template_defined_at,
             ),
         );
         return [$return_type];
@@ -985,6 +1016,7 @@ final class TypeExpander
 
     /**
      * @param TKeyOf|TValueOf $return_type
+     * @param array<string, true> $do_not_expand_template_defined_at
      * @return non-empty-list<Atomic>
      */
     private static function expandKeyOfValueOf(
@@ -999,6 +1031,7 @@ final class TypeExpander
         bool $expand_generic = false,
         bool $expand_templates = false,
         bool $throw_on_unresolvable_constant = false,
+        array $do_not_expand_template_defined_at = [],
     ): array {
         // Expand class constants to their atomics
         $type_atomics = [];
@@ -1016,6 +1049,7 @@ final class TypeExpander
                     $expand_generic,
                     $expand_templates,
                     $throw_on_unresolvable_constant,
+                    $do_not_expand_template_defined_at,
                 );
                 $type_atomics = [...$type_atomics, ...$type_param_expanded];
                 continue;

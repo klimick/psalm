@@ -12,7 +12,8 @@ use Psalm\Config;
 use Psalm\Context;
 use Psalm\FileManipulation;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
-use Psalm\Internal\Analyzer\Statements\Expression\Call\ClassTemplateParamCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\Method\MethodCallProhibitionAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\StaticCallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
@@ -69,10 +70,8 @@ final class ExistingAtomicStaticCallAnalyzer
         string $cased_method_id,
         ClassLikeStorage $class_storage,
         bool &$moved_call,
-        ?TemplateResult $inferred_template_result = null,
     ): void {
         $fq_class_name = $method_id->fq_class_name;
-        $method_name_lc = $method_id->method_name;
 
         $codebase = $statements_analyzer->getCodebase();
         $config = $codebase->config;
@@ -145,50 +144,28 @@ final class ExistingAtomicStaticCallAnalyzer
             }
         }
 
-        $found_generic_params = ClassTemplateParamCollector::collect(
-            $codebase,
-            $class_storage,
-            $class_storage,
-            $method_name_lc,
+        $method_storage = $codebase->methods->getUserMethodStorage($method_id);
+
+        $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
+            $stmt,
+            $context,
+            $statements_analyzer,
+            $method_storage,
             $lhs_type_part,
-            !$statements_analyzer->isStatic() && $method_id->fq_class_name === $context->self,
         );
 
-        if ($found_generic_params
-            && $stmt->class instanceof PhpParser\Node\Name
-            && $stmt->class->getParts() === ['parent']
-            && $context->self
-            && ($self_class_storage = $codebase->classlike_storage_provider->get($context->self))
-            && $self_class_storage->template_extended_params
-        ) {
-            foreach ($self_class_storage->template_extended_params as $template_fq_class_name => $extended_types) {
-                foreach ($extended_types as $type_key => $extended_type) {
-                    if (isset($found_generic_params[$type_key][$template_fq_class_name])) {
-                        $found_generic_params[$type_key][$template_fq_class_name] = $extended_type;
-                        continue;
-                    }
+        $was_contextual_type_resolver = $context->contextual_type_resolver;
+        $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
+            $context,
+            $codebase,
+            $method_storage,
+            $collected_argument_templates,
+        );
 
-                    foreach ($extended_type->getAtomicTypes() as $t) {
-                        if ($t instanceof TTemplateParam
-                            && isset($found_generic_params[$t->param_name][$t->defining_class])
-                        ) {
-                            $found_generic_params[$type_key][$template_fq_class_name]
-                                = $found_generic_params[$t->param_name][$t->defining_class];
-                        } else {
-                            $found_generic_params[$type_key][$template_fq_class_name]
-                                = $extended_type;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        $template_result = new TemplateResult([], $found_generic_params ?: []);
-
-        if ($inferred_template_result) {
-            $template_result->lower_bounds += $inferred_template_result->lower_bounds;
-        }
+        $template_result = new TemplateResult(
+            $collected_argument_templates->template_types,
+            $collected_argument_templates->lower_bounds,
+        );
 
         if (CallAnalyzer::checkMethodArgs(
             $method_id,
@@ -198,8 +175,12 @@ final class ExistingAtomicStaticCallAnalyzer
             new CodeLocation($statements_analyzer->getSource(), $stmt),
             $statements_analyzer,
         ) === false) {
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
+
             return;
         }
+
+        $context->contextual_type_resolver = $was_contextual_type_resolver;
 
         $fq_class_name = $stmt->class instanceof PhpParser\Node\Name && $stmt->class->getParts() === ['parent']
             ? (string) $statements_analyzer->getFQCLN()
@@ -260,8 +241,6 @@ final class ExistingAtomicStaticCallAnalyzer
                 $config,
             );
         }
-
-        $method_storage = $codebase->methods->getUserMethodStorage($method_id);
 
         if ($method_storage) {
             if ($method_storage->abstract
@@ -495,6 +474,10 @@ final class ExistingAtomicStaticCallAnalyzer
                 $bindable_template_types = $return_type_candidate->getTemplateTypes();
 
                 foreach ($bindable_template_types as $template_type) {
+                    if ($template_type->defining_class === 'anonymous-fn') {
+                        continue;
+                    }
+
                     if (!isset(
                         $template_result->lower_bounds
                         [$template_type->param_name]

@@ -47,6 +47,23 @@ final class TemplateResult
      */
     public array $upper_bounds_unintersectable_types = [];
 
+    public ?self $contextual_template_result = null;
+
+    /**
+     * @var array<string, positive-int>
+     */
+    public array $used_anonymous_template_names = [];
+
+    /**
+     * @var array<string, true>
+     */
+    public array $defined_anon_template = [];
+
+    /**
+     * @var array<string, true>
+     */
+    public array $collisions_resolved_at = [];
+
     /**
      * @param  array<string, array<string, Union>> $template_types
      * @param  array<string, array<string, Union>> $lower_bounds

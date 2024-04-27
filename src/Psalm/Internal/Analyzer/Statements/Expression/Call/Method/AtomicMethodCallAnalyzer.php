@@ -80,7 +80,6 @@ final class AtomicMethodCallAnalyzer extends CallAnalyzer
         bool $is_intersection,
         ?string $lhs_var_id,
         AtomicMethodCallAnalysisResult $result,
-        ?TemplateResult $inferred_template_result = null,
     ): void {
         if ($lhs_type_part instanceof TTemplateParam
             && !$lhs_type_part->as->isMixed()
@@ -114,7 +113,6 @@ final class AtomicMethodCallAnalyzer extends CallAnalyzer
                 $context,
                 $lhs_type_part->callable,
                 $result,
-                $inferred_template_result,
             );
             return;
         }
@@ -493,7 +491,6 @@ final class AtomicMethodCallAnalyzer extends CallAnalyzer
             $lhs_var_id,
             $method_id,
             $result,
-            $inferred_template_result,
         );
 
         $statements_analyzer->node_data = $old_node_data;
@@ -916,7 +913,6 @@ final class AtomicMethodCallAnalyzer extends CallAnalyzer
         Context $context,
         ?TCallable $lhs_type_part_callable,
         AtomicMethodCallAnalysisResult $result,
-        ?TemplateResult $inferred_template_result = null,
     ): void {
         $method_id = 'object::__invoke';
         $result->existent_method_ids[$method_id] = true;
@@ -935,8 +931,6 @@ final class AtomicMethodCallAnalyzer extends CallAnalyzer
                 $result->too_many_arguments_method_ids[] = new MethodIdentifier('callable-object', '__invoke');
             }
 
-            $template_result = $inferred_template_result ?? new TemplateResult([], []);
-
             ArgumentsAnalyzer::analyze(
                 $statements_analyzer,
                 $stmt->getArgs(),
@@ -944,7 +938,6 @@ final class AtomicMethodCallAnalyzer extends CallAnalyzer
                 $method_id,
                 false,
                 $context,
-                $template_result,
             );
 
             ArgumentsAnalyzer::checkArgumentsMatch(
@@ -954,7 +947,7 @@ final class AtomicMethodCallAnalyzer extends CallAnalyzer
                 $lhs_type_part_callable->params ?? [],
                 null,
                 null,
-                $template_result,
+                new TemplateResult([], []),
                 new CodeLocation($statements_analyzer->getSource(), $stmt),
                 $context,
             );

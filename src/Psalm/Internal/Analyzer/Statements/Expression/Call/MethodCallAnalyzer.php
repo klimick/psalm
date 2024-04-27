@@ -52,7 +52,6 @@ final class MethodCallAnalyzer extends CallAnalyzer
         PhpParser\Node\Expr\MethodCall $stmt,
         Context $context,
         bool $real_method_call = true,
-        ?TemplateResult $template_result = null,
     ): bool {
         $was_inside_call = $context->inside_call;
 
@@ -64,13 +63,19 @@ final class MethodCallAnalyzer extends CallAnalyzer
             $existing_stmt_var_type = $statements_analyzer->node_data->getType($stmt->var);
         }
 
+        $was_contextual_resolver = $context->contextual_type_resolver;
+        $context->contextual_type_resolver = null;
+
         if ($existing_stmt_var_type) {
             $statements_analyzer->node_data->setType($stmt->var, $existing_stmt_var_type);
         } elseif (ExpressionAnalyzer::analyze($statements_analyzer, $stmt->var, $context) === false) {
             $context->inside_call = $was_inside_call;
+            $context->contextual_type_resolver = $was_contextual_resolver;
 
             return false;
         }
+
+        $context->contextual_type_resolver = $was_contextual_resolver;
 
         if (!$stmt->name instanceof PhpParser\Node\Identifier) {
             $context->inside_call = true;
@@ -208,7 +213,6 @@ final class MethodCallAnalyzer extends CallAnalyzer
                 false,
                 $lhs_var_id,
                 $result,
-                $template_result,
             );
             if (isset($context->vars_in_scope[$lhs_var_id])
                 && ($possible_new_class_type = $context->vars_in_scope[$lhs_var_id]) instanceof Union

@@ -12,6 +12,8 @@ use Psalm\Internal\Algebra;
 use Psalm\Internal\Algebra\FormulaGenerator;
 use Psalm\Internal\Analyzer\AlgebraAnalyzer;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\ExpressionAnalyzer;
 use Psalm\Internal\Analyzer\StatementsAnalyzer;
@@ -21,6 +23,7 @@ use Psalm\Internal\Codebase\TaintFlowGraph;
 use Psalm\Internal\DataFlow\TaintSink;
 use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Type\Comparator\CallableTypeComparator;
+use Psalm\Internal\Type\TemplateInferredTypeReplacer;
 use Psalm\Internal\Type\TemplateResult;
 use Psalm\Internal\Type\TypeCombiner;
 use Psalm\Issue\DeprecatedFunction;
@@ -85,7 +88,6 @@ final class FunctionCallAnalyzer extends CallAnalyzer
         StatementsAnalyzer $statements_analyzer,
         PhpParser\Node\Expr\FuncCall $stmt,
         Context $context,
-        ?TemplateResult $template_result = null,
     ): bool {
         $function_name = $stmt->name;
 
@@ -168,15 +170,23 @@ final class FunctionCallAnalyzer extends CallAnalyzer
             $set_inside_conditional = true;
         }
 
-        if (!$template_result) {
-            $template_result = new TemplateResult([], []);
-        }
+        $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
+            $stmt,
+            $context,
+            $statements_analyzer,
+            $function_call_info->function_storage,
+        );
+
+        $was_contextual_resolver = $context->contextual_type_resolver;
+
+        $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
+            $context,
+            $codebase,
+            $function_call_info->function_storage,
+            $collected_argument_templates,
+        );
 
         if (!$is_first_class_callable) {
-            if (isset($function_call_info->function_storage->template_types)) {
-                $template_result->template_types += $function_call_info->function_storage->template_types ?: [];
-            }
-
             ArgumentsAnalyzer::analyze(
                 $statements_analyzer,
                 $stmt->getArgs(),
@@ -184,7 +194,6 @@ final class FunctionCallAnalyzer extends CallAnalyzer
                 $function_call_info->function_id,
                 $function_call_info->allow_named_args,
                 $context,
-                $template_result,
             );
         }
 
@@ -212,9 +221,10 @@ final class FunctionCallAnalyzer extends CallAnalyzer
             }
         }
 
-        $already_inferred_lower_bounds = $template_result->lower_bounds;
-
-        $template_result = new TemplateResult([], []);
+        $template_result = new TemplateResult(
+            $collected_argument_templates->template_types,
+            $collected_argument_templates->lower_bounds,
+        );
 
         // do this here to allow closure param checks
         if (!$is_first_class_callable && $function_call_info->function_params !== null) {
@@ -229,16 +239,16 @@ final class FunctionCallAnalyzer extends CallAnalyzer
                 $code_location,
                 $context,
             );
+
+            CallAnalyzer::checkTemplateResult(
+                $statements_analyzer,
+                $template_result,
+                $code_location,
+                $function_call_info->function_id,
+            );
         }
 
-        CallAnalyzer::checkTemplateResult(
-            $statements_analyzer,
-            $template_result,
-            $code_location,
-            $function_call_info->function_id,
-        );
-
-        $template_result->lower_bounds = [...$template_result->lower_bounds, ...$already_inferred_lower_bounds];
+        $context->contextual_type_resolver = $was_contextual_resolver;
 
         if ($function_name instanceof PhpParser\Node\Name && $function_call_info->function_id) {
             $stmt_type = FunctionCallReturnTypeFetcher::fetch(

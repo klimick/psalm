@@ -84,8 +84,10 @@ final class ArgumentsAnalyzer
         ?string $method_id,
         bool $allow_named_args,
         Context $context,
-        ?TemplateResult $template_result = null,
     ): ?bool {
+        // @todo: Remove when plugins for array_map/array_filter will be implemented
+        $legacy_template_result = new TemplateResult([], []);
+
         $last_param = $function_params
             ? $function_params[count($function_params) - 1]
             : null;
@@ -176,6 +178,11 @@ final class ArgumentsAnalyzer
                     || $arg->value instanceof PhpParser\Node\Expr\BinaryOp
                 )
             ) {
+                $was_contextual_type_resolver = $context->contextual_type_resolver;
+                $context->contextual_type_resolver = $context->contextual_type_resolver !== null && isset($param->type)
+                    ? $context->contextual_type_resolver->withContextualType($param->type)
+                    : null;
+
                 if (self::handleByRefFunctionArg(
                     $statements_analyzer,
                     $method_id,
@@ -183,8 +190,12 @@ final class ArgumentsAnalyzer
                     $arg,
                     $context,
                 ) === false) {
+                    $context->contextual_type_resolver = $was_contextual_type_resolver;
+
                     return false;
                 }
+
+                $context->contextual_type_resolver = $was_contextual_type_resolver;
 
                 continue;
             }
@@ -199,34 +210,28 @@ final class ArgumentsAnalyzer
                 $toggled_class_exists = true;
             }
 
-            $high_order_template_result = null;
-            $high_order_callable_info = $param
-                ? HighOrderFunctionArgHandler::getCallableArgInfo($context, $arg->value, $statements_analyzer, $param)
-                : null;
-
-            if ($param && $high_order_callable_info) {
-                $high_order_template_result = HighOrderFunctionArgHandler::remapLowerBounds(
-                    $statements_analyzer,
-                    $template_result ?? new TemplateResult([], []),
-                    $high_order_callable_info,
-                    $param->type ?? Type::getMixed(),
-                );
-            } elseif (($arg->value instanceof PhpParser\Node\Expr\Closure
+            if (($arg->value instanceof PhpParser\Node\Expr\Closure
                     || $arg->value instanceof PhpParser\Node\Expr\ArrowFunction)
                 && $param
                 && !$arg->value->getDocComment()
+                && ($method_id === 'array_filter' || $method_id === 'array_map')
             ) {
                 self::handleClosureArg(
                     $statements_analyzer,
                     $args,
                     $method_id,
                     $context,
-                    $template_result ?? new TemplateResult([], []),
+                    $legacy_template_result,
                     $argument_offset,
                     $arg,
                     $param,
                 );
             }
+
+            $was_contextual_type_resolver = $context->contextual_type_resolver;
+            $context->contextual_type_resolver = $context->contextual_type_resolver !== null && isset($param->type)
+                ? $context->contextual_type_resolver->withContextualType($param->type)
+                : null;
 
             $was_inside_call = $context->inside_call;
             $context->inside_call = true;
@@ -234,33 +239,17 @@ final class ArgumentsAnalyzer
             $was_inside_isset = $context->inside_isset;
             $context->inside_isset = false;
 
-            if (ExpressionAnalyzer::analyze(
-                $statements_analyzer,
-                $arg->value,
-                $context,
-                false,
-                null,
-                null,
-                $high_order_template_result,
-            ) === false) {
+            if (ExpressionAnalyzer::analyze($statements_analyzer, $arg->value, $context) === false) {
                 $context->inside_isset = $was_inside_isset;
                 $context->inside_call = $was_inside_call;
+                $context->contextual_type_resolver = $was_contextual_type_resolver;
 
                 return false;
             }
 
             $context->inside_isset = $was_inside_isset;
             $context->inside_call = $was_inside_call;
-
-            if ($high_order_callable_info && $high_order_template_result) {
-                HighOrderFunctionArgHandler::enhanceCallableArgType(
-                    $context,
-                    $arg->value,
-                    $statements_analyzer,
-                    $high_order_callable_info,
-                    $high_order_template_result,
-                );
-            }
+            $context->contextual_type_resolver = $was_contextual_type_resolver;
 
             if (($argument_offset === 0 && $method_id === 'array_filter' && count($args) === 2)
                 || ($argument_offset > 0 && $method_id === 'array_map' && count($args) >= 2)
@@ -271,29 +260,7 @@ final class ArgumentsAnalyzer
                     $argument_offset,
                     $arg,
                     $context,
-                    $template_result,
-                );
-            }
-
-            $inferred_arg_type = $statements_analyzer->node_data->getType($arg->value);
-
-            if (null !== $inferred_arg_type
-                && null !== $template_result
-                && null !== $param
-                && null !== $param->type
-                && !$arg->unpack
-            ) {
-                $codebase = $statements_analyzer->getCodebase();
-
-                TemplateStandinTypeReplacer::fillTemplateResult(
-                    $param->type,
-                    $template_result,
-                    $codebase,
-                    $statements_analyzer,
-                    $inferred_arg_type,
-                    $argument_offset,
-                    $context->self,
-                    $context->calling_method_id ?: $context->calling_function_id,
+                    $legacy_template_result,
                 );
             }
 
@@ -321,7 +288,7 @@ final class ArgumentsAnalyzer
         int $argument_offset,
         PhpParser\Node\Arg $arg,
         Context $context,
-        ?TemplateResult &$template_result,
+        TemplateResult $template_result
     ): void {
         $codebase = $statements_analyzer->getCodebase();
 
@@ -357,10 +324,6 @@ final class ArgumentsAnalyzer
         );
 
         if ($replace_template_result->lower_bounds) {
-            if (!$template_result) {
-                $template_result = new TemplateResult([], []);
-            }
-
             $template_result->lower_bounds += $replace_template_result->lower_bounds;
         }
     }
@@ -478,27 +441,10 @@ final class ArgumentsAnalyzer
                         || $replaced_type_part instanceof TClosure
                     ) {
                         if (isset($replaced_type_part->params[$closure_param_offset]->type)) {
-                            $replaced_param_type = $replaced_type_part->params[$closure_param_offset]->type;
-
-                            if ($replaced_param_type->hasTemplate()) {
-                                $replaced_param_type = TypeExpander::expandUnion(
-                                    $codebase,
-                                    $replaced_param_type,
-                                    null,
-                                    null,
-                                    null,
-                                    true,
-                                    false,
-                                    false,
-                                    true,
-                                    true,
-                                );
-                            }
-
                             if ($param_storage->type && !$param_type_inferred) {
                                 $type_match_found = UnionTypeComparator::isContainedBy(
                                     $codebase,
-                                    $replaced_param_type,
+                                    $replaced_type_part->params[$closure_param_offset]->type,
                                     $param_storage->type,
                                 );
 
@@ -509,7 +455,7 @@ final class ArgumentsAnalyzer
 
                             $newly_inferred_type = Type::combineUnionTypes(
                                 $newly_inferred_type,
-                                $replaced_param_type,
+                                $replaced_type_part->params[$closure_param_offset]->type,
                                 $codebase,
                             );
                         }
@@ -1483,7 +1429,7 @@ final class ArgumentsAnalyzer
         array $function_params,
         ?FunctionLikeParameter $last_param,
     ): ?TemplateResult {
-        $template_types = CallAnalyzer::getTemplateTypesForCall(
+        $templates_for_call = CallAnalyzer::getTemplateTypesForCall(
             $codebase,
             $class_storage,
             $self_fq_class_name,
@@ -1492,17 +1438,18 @@ final class ArgumentsAnalyzer
             $class_generic_params,
         );
 
-        if (!$template_types) {
+        if ($templates_for_call === []) {
             return null;
         }
 
-        if (!$template_result) {
-            return new TemplateResult($template_types, []);
+        if ($template_result === null) {
+            return new TemplateResult($templates_for_call, []);
         }
 
-        if (!$template_result->template_types) {
-            $template_result->template_types = $template_types;
-        }
+        $template_result->template_types = [
+            ...$template_result->template_types,
+            ...$templates_for_call,
+        ];
 
         foreach ($args as $argument_offset => $arg) {
             $function_param = null;

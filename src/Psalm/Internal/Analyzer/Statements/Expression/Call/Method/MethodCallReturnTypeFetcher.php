@@ -70,19 +70,17 @@ final class MethodCallReturnTypeFetcher
         $method_name = $method_id->method_name;
 
         $class_storage = $codebase->methods->getClassLikeStorageForMethod($method_id);
-        $method_storage = ($class_storage->methods[$method_id->method_name] ?? null);
 
         if ($stmt->isFirstClassCallable()) {
-            if ($method_storage) {
-                return new Union([new TClosure(
-                    'Closure',
-                    $method_storage->params,
-                    $method_storage->return_type,
-                    $method_storage->pure,
-                )]);
-            }
+            $closure = $codebase->methods->getStorage($declaring_method_id ?? $method_id)->toAnonymous(
+                $codebase,
+                true,
+                TClosure::class,
+                $lhs_type_part,
+                $context->getPossibleTemplateDefiners(),
+            );
 
-            return Type::getClosure();
+            return new Union([$closure]);
         }
 
         if ($codebase->methods->return_type_provider->has($premixin_method_id->fq_class_name)) {
@@ -575,6 +573,10 @@ final class MethodCallReturnTypeFetcher
                             [$template_type->defining_class],
                     )
                 ) {
+                    if ($template_type->defining_class === 'anonymous-fn') {
+                        continue;
+                    }
+
                     if ($template_type->param_name === 'TFunctionArgCount') {
                         $template_result->lower_bounds[$template_type->param_name] = [
                             'fn-' . $method_id->method_name => [

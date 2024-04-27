@@ -33,9 +33,7 @@ use Psalm\Type\Union;
 use UnexpectedValueException;
 
 use function array_merge;
-use function array_shift;
 use function array_values;
-use function assert;
 use function str_starts_with;
 
 /**
@@ -281,11 +279,19 @@ final class TemplateInferredTypeReplacer
                             $atomic_template_type->extra_types,
                         ));
                     } elseif ($atomic_template_type instanceof TObject) {
-                        $first_atomic_type = array_shift($atomic_type->extra_types);
-                        assert($first_atomic_type !== null);
+                        $first_atomic_type = null;
+                        $rest_atomic_types = [];
 
-                        if ($atomic_type->extra_types) {
-                            $first_atomic_type = $first_atomic_type->setIntersectionTypes($atomic_type->extra_types);
+                        foreach ($atomic_type->extra_types as $key => $extra_type) {
+                            if (!$first_atomic_type) {
+                                $first_atomic_type = $extra_type;
+                            } else {
+                                $rest_atomic_types[$key] = $extra_type;
+                            }
+                        }
+
+                        if ($rest_atomic_types) {
+                            $first_atomic_type = $first_atomic_type->setIntersectionTypes($rest_atomic_types);
                         }
 
                         $types []= $first_atomic_type;

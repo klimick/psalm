@@ -6,10 +6,14 @@ namespace Psalm\Internal\Analyzer;
 
 use PhpParser;
 use Psalm\CodeLocation;
+use Psalm\Codebase;
 use Psalm\Context;
 use Psalm\Internal\Codebase\VariableUseGraph;
 use Psalm\Internal\DataFlow\DataFlowNode;
 use Psalm\Internal\PhpVisitor\ShortClosureVisitor;
+use Psalm\Internal\Type\Comparator\TypeComparisonResult;
+use Psalm\Internal\Type\Comparator\UnionTypeComparator;
+use Psalm\Internal\Type\TypeExpander;
 use Psalm\Issue\DuplicateParam;
 use Psalm\Issue\PossiblyUndefinedVariable;
 use Psalm\Issue\UndefinedVariable;
@@ -32,6 +36,9 @@ use function strtolower;
 final class ClosureAnalyzer extends FunctionLikeAnalyzer
 {
     use UnserializeMemoryUsageSuppressionTrait;
+
+    public ?Union $possibly_return_type = null;
+
     /**
      * @param PhpParser\Node\Expr\Closure|PhpParser\Node\Expr\ArrowFunction $function
      */
@@ -202,6 +209,12 @@ final class ClosureAnalyzer extends FunctionLikeAnalyzer
         $use_context->calling_method_id = $context->calling_method_id;
         $use_context->phantom_classes = $context->phantom_classes;
 
+        $closure_analyzer->possibly_return_type = self::inferParamTypesFromContextualTypeAndGetPossibleReturnType(
+            $context,
+            $statements_analyzer,
+            $closure_analyzer,
+        );
+
         $byref_vars = [];
         $closure_analyzer->analyze($use_context, $statements_analyzer->node_data, $context, false, $byref_vars);
 
@@ -320,5 +333,102 @@ final class ClosureAnalyzer extends FunctionLikeAnalyzer
         }
 
         return null;
+    }
+
+    /**
+     * If a function returns a closure, we try to infer the param/return types of
+     * the inner closure.
+     *
+     * @see \Psalm\Tests\ReturnTypeTest:756
+     */
+    private static function inferParamTypesFromContextualTypeAndGetPossibleReturnType(
+        Context $context,
+        StatementsAnalyzer $statements_analyzer,
+        ClosureAnalyzer $closure_analyzer
+    ): ?Union {
+        if (!$context->contextual_type_resolver) {
+            return null;
+        }
+
+        $contextual_callable_type = ClosureAnalyzerContextualTypeExtractor::extract(
+            $context->contextual_type_resolver,
+        );
+
+        if ($contextual_callable_type === null) {
+            return null;
+        }
+
+        if ($contextual_callable_type->params === null) {
+            return null;
+        }
+
+        $codebase = $statements_analyzer->getCodebase();
+
+        $calling_closure_storage = $codebase->getFunctionLikeStorage(
+            $statements_analyzer,
+            $closure_analyzer->getClosureId(),
+        );
+
+        foreach ($calling_closure_storage->params as $param_index => $calling_param) {
+            $contextual_param_type = $contextual_callable_type->params[$param_index]->type ?? null;
+
+            // No contextual type info. Don't infer.
+            if ($contextual_param_type === null) {
+                continue;
+            }
+
+            // Explicit docblock type. Don't infer.
+            if ($calling_param->type !== $calling_param->signature_type) {
+                continue;
+            }
+
+            $contextual_param_type = self::expandContextualType($codebase, $context, $contextual_param_type);
+            $type_comparison_result = new TypeComparisonResult();
+
+            if ($calling_param->type === null
+                || UnionTypeComparator::isContainedBy(
+                    $codebase,
+                    $contextual_param_type,
+                    $calling_param->type,
+                    false,
+                    false,
+                    $type_comparison_result,
+                )
+            ) {
+                if ($type_comparison_result->to_string_cast) {
+                    continue;
+                }
+
+                $calling_param->type = $contextual_param_type;
+                $calling_param->type_inferred = true;
+            }
+        }
+
+        if (!$calling_closure_storage->template_types && $contextual_callable_type->templates) {
+            $calling_closure_storage->template_types = $contextual_callable_type->getTemplateMap();
+        }
+
+        return $contextual_callable_type->return_type;
+    }
+
+    private static function expandContextualType(Codebase $codebase, Context $context, Union $contextual_type): Union
+    {
+        $expand_templates = true;
+        $do_not_expand_template_defined_at = $context->getPossibleTemplateDefiners();
+
+        return TypeExpander::expandUnion(
+            $codebase,
+            $contextual_type,
+            null,
+            null,
+            null,
+            true,
+            false,
+            false,
+            false,
+            $expand_templates,
+            false,
+            $do_not_expand_template_defined_at,
+        );
     }
 }

@@ -1491,9 +1491,10 @@ final class FunctionLikeDocblockScanner
                     new CodeLocation($file_scanner, $stmt, null, true),
                 );
             } else {
-                $storage->template_types[$template_name] = [
-                    'fn-' . strtolower($cased_function_id) => $template_type,
-                ];
+                $storage->template_types[$template_name]
+                    = $stmt instanceof PhpParser\Node\Expr\Closure || $stmt instanceof PhpParser\Node\Expr\ArrowFunction
+                        ? ['anonymous-fn' => $template_type]
+                        : ['fn-' . strtolower($cased_function_id) => $template_type];
             }
         }
 
