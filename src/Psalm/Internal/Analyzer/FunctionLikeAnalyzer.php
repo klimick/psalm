@@ -681,7 +681,6 @@ abstract class FunctionLikeAnalyzer extends SourceAnalyzer
                             $closure_atomic->byref_uses,
                             $closure_atomic->extra_types,
                             $closure_atomic->from_docblock,
-                            $closure_atomic->templates,
                         ),
                     ]),
                 );
