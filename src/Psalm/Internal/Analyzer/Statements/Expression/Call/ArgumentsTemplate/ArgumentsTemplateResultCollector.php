@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate;
 
 use PhpParser\Node\Expr\CallLike;
@@ -36,7 +38,7 @@ final class ArgumentsTemplateResultCollector
         Context $context,
         StatementsAnalyzer $statements_analyzer,
         ?FunctionLikeStorage $function_storage,
-        ?Atomic $lhs_type_part = null
+        ?Atomic $lhs_type_part = null,
     ): CollectedArgumentTemplates {
         return new CollectedArgumentTemplates(
             array_merge(
@@ -57,7 +59,7 @@ final class ArgumentsTemplateResultCollector
      */
     private static function getClassTemplates(
         FunctionLikeStorage $function_like_storage,
-        StatementsAnalyzer $statements_analyzer
+        StatementsAnalyzer $statements_analyzer,
     ): array {
         $codebase = $statements_analyzer->getCodebase();
 
@@ -82,7 +84,7 @@ final class ArgumentsTemplateResultCollector
         Context $context,
         StatementsAnalyzer $statements_analyzer,
         FunctionLikeStorage $function_like_storage,
-        TNamedObject $lhs_type_part
+        TNamedObject $lhs_type_part,
     ): array {
         if ($function_like_storage->cased_name === null
             || !$function_like_storage instanceof MethodStorage
@@ -162,7 +164,7 @@ final class ArgumentsTemplateResultCollector
         StatementsAnalyzer $statements_analyzer,
         TNamedObject $lhs_type_part,
         string $fq_classlike_name,
-        string $method_name_lc
+        string $method_name_lc,
     ): ?array {
         $parent_source = $statements_analyzer->getSource();
 
@@ -201,7 +203,7 @@ final class ArgumentsTemplateResultCollector
     private static function getIfThisIsTypeLowerBounds(
         StatementsAnalyzer $statements_analyzer,
         FunctionLikeStorage $function_like_storage,
-        TNamedObject $lhs_type_part
+        TNamedObject $lhs_type_part,
     ): array {
         $codebase = $statements_analyzer->getCodebase();
 

@@ -344,7 +344,7 @@ final class ClosureAnalyzer extends FunctionLikeAnalyzer
     private static function inferParamTypesFromContextualTypeAndGetPossibleReturnType(
         Context $context,
         StatementsAnalyzer $statements_analyzer,
-        ClosureAnalyzer $closure_analyzer
+        ClosureAnalyzer $closure_analyzer,
     ): ?Union {
         if (!$context->contextual_type_resolver) {
             return null;

@@ -55,7 +55,6 @@ use Psalm\Type\Atomic\TTemplateParam;
 use Psalm\Type\Union;
 
 use function array_filter;
-use function array_map;
 use function array_values;
 use function assert;
 use function count;

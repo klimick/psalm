@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Psalm;
 
 use Psalm\Internal\Type\TemplateInferredTypeReplacer;
@@ -16,7 +18,7 @@ final class ContextualTypeResolver
     public function __construct(
         Union $contextual_type,
         TemplateResult $template_result,
-        Codebase $codebase
+        Codebase $codebase,
     ) {
         $this->contextual_type = $contextual_type;
         $this->template_result = $template_result;

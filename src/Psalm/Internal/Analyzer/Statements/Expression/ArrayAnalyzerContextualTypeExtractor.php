@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Psalm\Internal\Analyzer\Statements\Expression;
 
 use Psalm\ContextualTypeResolver;
@@ -15,7 +17,7 @@ final class ArrayAnalyzerContextualTypeExtractor
 {
     public static function extract(
         Union $array_key_type,
-        ContextualTypeResolver $contextual_type_resolver
+        ContextualTypeResolver $contextual_type_resolver,
     ): ?ContextualTypeResolver {
         $codebase = $contextual_type_resolver->getCodebase();
         $contextual_type = $contextual_type_resolver->resolve();

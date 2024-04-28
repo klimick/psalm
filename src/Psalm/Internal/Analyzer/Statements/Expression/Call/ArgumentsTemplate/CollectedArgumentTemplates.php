@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate;
 
 use Psalm\Type\Union;
@@ -27,7 +29,7 @@ final class CollectedArgumentTemplates
      */
     public function __construct(
         array $template_types = [],
-        array $lower_bounds = []
+        array $lower_bounds = [],
     ) {
         $this->template_types = $template_types;
         $this->lower_bounds = $lower_bounds;

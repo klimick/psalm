@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate;
 
 use Psalm\Codebase;
@@ -23,7 +25,7 @@ final class CallLikeContextualTypeExtractor
         Context $context,
         Codebase $codebase,
         ?FunctionLikeStorage $function_storage,
-        CollectedArgumentTemplates $collected_templates
+        CollectedArgumentTemplates $collected_templates,
     ): ContextualTypeResolver {
         $empty_contextual_type = Type::getNever();
 

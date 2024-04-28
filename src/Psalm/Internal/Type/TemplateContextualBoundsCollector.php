@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Psalm\Internal\Type;
 
 use Psalm\Codebase;
@@ -47,7 +49,7 @@ final class TemplateContextualBoundsCollector
         Codebase $codebase,
         Union $contextual_type,
         Union $return_type,
-        array $template_types
+        array $template_types,
     ): array {
         $collector = new self($codebase, $template_types);
         $collector->collectUnion($contextual_type, $return_type);

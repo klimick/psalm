@@ -288,7 +288,7 @@ final class ArgumentsAnalyzer
         int $argument_offset,
         PhpParser\Node\Arg $arg,
         Context $context,
-        TemplateResult $template_result
+        TemplateResult $template_result,
     ): void {
         $codebase = $statements_analyzer->getCodebase();
 

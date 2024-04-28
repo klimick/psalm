@@ -46,7 +46,6 @@ use Psalm\Internal\Analyzer\Statements\Expression\YieldAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\YieldFromAnalyzer;
 use Psalm\Internal\Analyzer\StatementsAnalyzer;
 use Psalm\Internal\FileManipulation\FileManipulationBuffer;
-use Psalm\Internal\Type\TemplateResult;
 use Psalm\Issue\RiskyTruthyFalsyComparison;
 use Psalm\Issue\UnrecognizedExpression;
 use Psalm\Issue\UnsupportedReferenceUsage;

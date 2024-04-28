@@ -22,7 +22,6 @@ use Psalm\Type\Union;
 use ReflectionFunction;
 
 use function function_exists;
-use function implode;
 use function mb_substr;
 use function print_r;
 use function stripos;

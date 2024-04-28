@@ -326,10 +326,7 @@ final class Context
      */
     public array $parent_remove_vars = [];
 
-    /**
-     * @var ContextualTypeResolver|null
-     */
-    public $contextual_type_resolver = null;
+    public ?ContextualTypeResolver $contextual_type_resolver = null;
 
     /** @internal */
     public function __construct(
