@@ -89,6 +89,7 @@ final class ArgumentsTemplateResultCollector
         if ($function_like_storage->cased_name === null
             || !$function_like_storage instanceof MethodStorage
             || $function_like_storage->defining_fqcln === null
+            || $function_like_storage->defining_fqcln === ''
         ) {
             return [];
         }
