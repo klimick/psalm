@@ -832,61 +832,64 @@ final class ArgumentAnalyzer
             $param_type = $param_type->setPossiblyUndefined(true);
         }
 
-        if ($param_type->hasCallableType() && $param_type->isSingle()) {
+        if ($param_type->hasCallableType()) {
             // we do this replacement early because later we don't have access to the
             // $statements_analyzer, which is necessary to understand string function names
             $input_type = $input_type->getBuilder();
-            foreach ($input_type->getAtomicTypes() as $key => $atomic_type) {
-                $container_callable_type = $param_type->getSingleAtomic();
-                $container_callable_type = $container_callable_type instanceof TCallable
-                    ? $container_callable_type
-                    : null;
 
-                $candidate_callable = CallableTypeComparator::getCallableFromAtomic(
-                    $codebase,
-                    $atomic_type,
-                    $container_callable_type,
-                    $statements_analyzer,
-                    true,
-                );
-
-                if ($candidate_callable && $candidate_callable !== $atomic_type) {
-                    // if we had an array callable, mark it as used now, since it's not possible later
-                    $potential_method_id = null;
-
-                    if ($atomic_type instanceof TKeyedArray) {
-                        $potential_method_id = CallableTypeComparator::getCallableMethodIdFromTKeyedArray(
-                            $atomic_type,
-                            $codebase,
-                            $context->calling_method_id,
-                            $statements_analyzer->getFilePath(),
-                        );
-                    } elseif ($atomic_type instanceof TLiteralString
-                              && strpos($atomic_type->value, '::')
-                    ) {
-                        $parts = explode('::', $atomic_type->value);
-                        $potential_method_id = new MethodIdentifier(
-                            $parts[0],
-                            strtolower($parts[1]),
-                        );
+            foreach ($input_type->getAtomicTypes() as $key => $input_atomic_type) {
+                foreach ($param_type->getAtomicTypes() as $container_atomic_type) {
+                    if (!$container_atomic_type instanceof TCallable) {
+                        continue;
                     }
 
-                    if ($potential_method_id && $potential_method_id !== 'not-callable') {
-                        $codebase->methods->methodExists(
-                            $potential_method_id,
-                            $context->calling_method_id,
-                            $arg_location,
-                            $statements_analyzer,
-                            $statements_analyzer->getFilePath(),
-                            true,
-                            $context->insideUse(),
-                        );
-                    }
+                    $candidate_callable = CallableTypeComparator::getCallableFromAtomic(
+                        $codebase,
+                        $input_atomic_type,
+                        $container_atomic_type,
+                        $statements_analyzer,
+                        true,
+                    );
 
-                    $input_type->removeType($key);
-                    $input_type->addType($candidate_callable);
+                    if ($candidate_callable && $candidate_callable !== $input_atomic_type) {
+                        // if we had an array callable, mark it as used now, since it's not possible later
+                        $potential_method_id = null;
+
+                        if ($input_atomic_type instanceof TKeyedArray) {
+                            $potential_method_id = CallableTypeComparator::getCallableMethodIdFromTKeyedArray(
+                                $input_atomic_type,
+                                $codebase,
+                                $context->calling_method_id,
+                                $statements_analyzer->getFilePath(),
+                            );
+                        } elseif ($input_atomic_type instanceof TLiteralString
+                            && strpos($input_atomic_type->value, '::')
+                        ) {
+                            $parts = explode('::', $input_atomic_type->value);
+                            $potential_method_id = new MethodIdentifier(
+                                $parts[0],
+                                strtolower($parts[1]),
+                            );
+                        }
+
+                        if ($potential_method_id && $potential_method_id !== 'not-callable') {
+                            $codebase->methods->methodExists(
+                                $potential_method_id,
+                                $context->calling_method_id,
+                                $arg_location,
+                                $statements_analyzer,
+                                $statements_analyzer->getFilePath(),
+                                true,
+                                $context->insideUse(),
+                            );
+                        }
+
+                        $input_type->removeType($key);
+                        $input_type->addType($candidate_callable);
+                    }
                 }
             }
+
             $input_type = $input_type->freeze();
         }
 
