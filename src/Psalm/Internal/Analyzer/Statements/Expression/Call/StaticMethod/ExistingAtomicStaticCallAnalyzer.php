@@ -474,10 +474,6 @@ final class ExistingAtomicStaticCallAnalyzer
                 $bindable_template_types = $return_type_candidate->getTemplateTypes();
 
                 foreach ($bindable_template_types as $template_type) {
-                    if ($template_type->defining_class === 'anonymous-fn') {
-                        continue;
-                    }
-
                     if (!isset(
                         $template_result->lower_bounds
                         [$template_type->param_name]

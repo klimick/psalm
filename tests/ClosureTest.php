@@ -450,8 +450,10 @@ class ClosureTest extends TestCase
             'closureFromCallableNamedFunction' => [
                 'code' => '<?php
                     $closure = Closure::fromCallable("strlen");
-                    /** @psalm-check-type-exact $closure = pure-Closure<T as string>(T): (T is "" ? 0 : (T is non-empty-string ? int<1, max> : int<0, max>)) */
                 ',
+                'assertions' => [
+                    '$closure' => 'pure-Closure(string):int<0, max>',
+                ],
             ],
             'allowClosureWithNarrowerReturn' => [
                 'code' => '<?php
@@ -627,27 +629,13 @@ class ClosureTest extends TestCase
             ],
             'FirstClassCallable:NamedFunction:strlen' => [
                 'code' => '<?php
-                    /**
-                     * @param non-empty-string $nonEmptyString
-                     * @return array{
-                     *     positiveInt: int<1, max>,
-                     *     nonNegativeInt: int<0, max>,
-                     *     zero: 0,
-                     * }
-                     */
-                    function test(string $string, string $nonEmptyString): array
-                    {
-                        $strlen = strlen(...);
-                        /** @psalm-check-type-exact $strlen = pure-Closure<T as string>(T): (T is "" ? 0 : (T is non-empty-string ? int<1, max> : int<0, max>)) */
-
-                        return [
-                            "positiveInt" => $strlen($nonEmptyString),
-                            "nonNegativeInt" => $strlen($string),
-                            "zero" => $strlen(""),
-                        ];
-                    }
+                    $closure = strlen(...);
+                    $result = $closure("test");
                 ',
-                'assertions' => [],
+                'assertions' => [
+                    '$closure' => 'pure-Closure(string):int<0, max>',
+                    '$result' => 'int<0, max>',
+                ],
                 'ignored_issues' => [],
                 'php_version' => '8.1',
             ],
@@ -1384,6 +1372,22 @@ class ClosureTest extends TestCase
                     fn(): string => (string) $a;
                 ',
                 'error_message' => 'UndefinedVariable',
+                'ignored_issues' => [],
+                'php_version' => '7.4',
+            ],
+            'forbidTemplateAnnotationOnClosure' => [
+                'code' => '<?php
+                    /** @template T */
+                    function (): void {};
+                ',
+                'error_message' => 'InvalidDocblock',
+            ],
+            'forbidTemplateAnnotationOnShortClosure' => [
+                'code' => '<?php
+                    /** @template T */
+                    fn(): bool => false;
+                ',
+                'error_message' => 'InvalidDocblock',
                 'ignored_issues' => [],
                 'php_version' => '7.4',
             ],

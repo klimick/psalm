@@ -333,7 +333,6 @@ final class TypeChecker extends TypeVisitor
         if ($this->prevent_template_covariance
             && !str_starts_with($atomic->defining_class, 'fn-')
             && $atomic->defining_class !== 'class-string-map'
-            && $atomic->defining_class !== 'anonymous-fn'
         ) {
             $codebase = $this->source->getCodebase();
 

@@ -56,10 +56,6 @@ final class ClosureFromCallableReturnTypeProvider implements MethodReturnTypePro
                             $candidate_callable->params,
                             $candidate_callable->return_type,
                             $candidate_callable->is_pure,
-                            [],
-                            [],
-                            false,
-                            $candidate_callable->templates,
                         );
                     } else {
                         return Type::getClosure();

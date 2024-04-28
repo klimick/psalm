@@ -9,7 +9,6 @@ use LogicException;
 use Psalm\Codebase;
 use Psalm\Exception\TypeParseTreeException;
 use Psalm\Internal\Analyzer\ProjectAnalyzer;
-use Psalm\Internal\Type\ParseTree\AnonymousFunctionGenericTree;
 use Psalm\Internal\Type\ParseTree\CallableParamTree;
 use Psalm\Internal\Type\ParseTree\CallableTree;
 use Psalm\Internal\Type\ParseTree\CallableWithReturnTypeTree;
@@ -247,19 +246,11 @@ final class TypeParser
                 throw new TypeParseTreeException('Invalid return type');
             }
 
-            $anonymous_template_type_map = [];
-
-            foreach ($callable_type->templates ?? [] as $template_param) {
-                $anonymous_template_type_map[$template_param->param_name] = [
-                    'anonymous-fn' => $template_param->as,
-                ];
-            }
-
             $return_type = self::getTypeFromTree(
                 $parse_tree->children[1],
                 $codebase,
                 null,
-                array_merge($template_type_map, $anonymous_template_type_map),
+                $template_type_map,
                 $type_aliases,
                 $from_docblock,
             );
@@ -338,26 +329,14 @@ final class TypeParser
         }
 
         if ($parse_tree instanceof TemplateAsTree) {
-            if (!isset($parse_tree->children[0])) {
-                throw new TypeParseTreeException('TemplateAsTree does not have a child');
-            }
-
-            $tree_type = self::getTypeFromTree(
-                $parse_tree->children[0],
-                $codebase,
-                null,
-                $template_type_map,
-                $type_aliases,
-                $from_docblock,
-            );
-
-            return new TTemplateParam(
+            $result = new TTemplateParam(
                 $parse_tree->param_name,
-                $tree_type instanceof Union ? $tree_type : new Union([$tree_type]),
+                new Union([new TNamedObject($parse_tree->as)]),
                 'class-string-map',
                 [],
                 $from_docblock,
             );
+            return $result;
         }
 
         if ($parse_tree instanceof ConditionalTree) {
@@ -1297,69 +1276,8 @@ final class TypeParser
         bool $from_docblock,
     ): TCallable|TClosure {
         $params = [];
-        $templates = [];
-        $anonymous_template_type_map = [];
 
-        $generic_tree = null;
-
-        if (isset($parse_tree->children[0]) && $parse_tree->children[0] instanceof AnonymousFunctionGenericTree) {
-            $generic_tree = $parse_tree->children[0];
-        }
-
-        foreach (null !== $generic_tree ? $generic_tree->children : [] as $child_tree) {
-            if ($child_tree instanceof TemplateAsTree) {
-                if (!isset($child_tree->children[0])) {
-                    throw new TypeParseTreeException('TemplateAsTree does not have a child');
-                }
-
-                $tree_type = self::getTypeFromTree(
-                    $child_tree->children[0],
-                    $codebase,
-                    null,
-                    array_merge($template_type_map, $anonymous_template_type_map),
-                    $type_aliases,
-                    $from_docblock,
-                );
-
-                $template = new TTemplateParam(
-                    $child_tree->param_name,
-                    $tree_type instanceof Union ? $tree_type : new Union([$tree_type]),
-                    'anonymous-fn',
-                );
-
-                $templates[] = $template;
-
-                $anonymous_template_type_map[$template->param_name] = [
-                    $template->defining_class => $template->as,
-                ];
-            } elseif ($child_tree instanceof Value) {
-                $template = new TTemplateParam(
-                    $child_tree->value,
-                    Type::getMixed(),
-                    'anonymous-fn',
-                );
-
-                $templates[] = $template;
-
-                $anonymous_template_type_map[$template->param_name] = [
-                    $template->defining_class => $template->as,
-                ];
-            } else {
-                throw new TypeParseTreeException('Unable to parse generics of anonymous function');
-            }
-        }
-
-        foreach ($templates as $template_param) {
-            $anonymous_template_type_map[$template_param->param_name] = [
-                'anonymous-fn' => $template_param->as,
-            ];
-        }
-
-        $children = null !== $generic_tree
-            ? array_slice($parse_tree->children, 1)
-            : $parse_tree->children;
-
-        foreach ($children as $child_tree) {
+        foreach ($parse_tree->children as $child_tree) {
             $is_variadic = false;
             $is_optional = false;
             $param_name = '';
@@ -1370,7 +1288,7 @@ final class TypeParser
                         $child_tree->children[0],
                         $codebase,
                         null,
-                        array_merge($template_type_map, $anonymous_template_type_map),
+                        $template_type_map,
                         $type_aliases,
                         $from_docblock,
                     );
@@ -1390,7 +1308,7 @@ final class TypeParser
                     $child_tree,
                     $codebase,
                     null,
-                    array_merge($template_type_map, $anonymous_template_type_map),
+                    $template_type_map,
                     $type_aliases,
                     $from_docblock,
                 );
@@ -1413,13 +1331,11 @@ final class TypeParser
 
         $pure = str_starts_with($parse_tree->value, 'pure-') ? true : null;
 
-        $function_templates = $templates === [] ? null : $templates;
-
         if (in_array(strtolower($parse_tree->value), ['closure', '\closure', 'pure-closure'], true)) {
-            return new TClosure('Closure', $params, null, $pure, [], [], $from_docblock, $function_templates);
+            return new TClosure('Closure', $params, null, $pure, [], [], $from_docblock);
         }
 
-        return new TCallable('callable', $params, null, $pure, $from_docblock, $function_templates);
+        return new TCallable('callable', $params, null, $pure, $from_docblock);
     }
 
     /**

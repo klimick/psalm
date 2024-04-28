@@ -2096,27 +2096,12 @@ abstract class FunctionLikeAnalyzer extends SourceAnalyzer
                 $closure_return_type = Type::getMixed();
             }
 
-            $templates = [];
-
-            foreach ($storage->template_types ?? [] as $param_name => $type_map) {
-                foreach ($type_map as $defining_class => $extends) {
-                    $templates[] = new TTemplateParam(
-                        $param_name,
-                        $extends,
-                        $defining_class,
-                    );
-                }
-            }
-
             $closure_type = new TClosure(
                 'Closure',
                 $storage->params,
                 $closure_return_type,
                 $storage instanceof FunctionStorage ? $storage->pure : null,
                 $storage instanceof FunctionStorage ? $storage->byref_uses : [],
-                [],
-                false,
-                $templates === [] ? null : $templates,
             );
 
             $type_provider->setType(

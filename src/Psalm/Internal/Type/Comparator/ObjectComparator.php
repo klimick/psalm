@@ -205,26 +205,6 @@ final class ObjectComparator
                         }
                     }
                 }
-
-                if ($intersection_input_type->defining_class === 'anonymous-fn'
-                    && $intersection_container_type->defining_class === 'anonymous-fn'
-                ) {
-                    if ($intersection_input_type->generilized
-                        && $intersection_container_type->generilized
-                        && $intersection_input_type->param_name !== $intersection_container_type->param_name
-                    ) {
-                        return false;
-                    }
-
-                    return UnionTypeComparator::isContainedBy(
-                        $codebase,
-                        $intersection_input_type->as,
-                        $intersection_container_type->as,
-                        false,
-                        false,
-                        $atomic_comparison_result,
-                    );
-                }
             }
 
             if ($intersection_container_type->param_name === $intersection_input_type->param_name
@@ -241,12 +221,6 @@ final class ObjectComparator
             ) {
                 if (str_starts_with($intersection_input_type->defining_class, 'fn-')
                     || str_starts_with($intersection_container_type->defining_class, 'fn-')
-                ) {
-                    return false;
-                }
-
-                if ($intersection_input_type->defining_class === 'anonymous-fn'
-                    || $intersection_container_type->defining_class === 'anonymous-fn'
                 ) {
                     return false;
                 }

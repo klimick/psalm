@@ -404,10 +404,6 @@ final class ClosureAnalyzer extends FunctionLikeAnalyzer
             }
         }
 
-        if (!$calling_closure_storage->template_types && $contextual_callable_type->templates) {
-            $calling_closure_storage->template_types = $contextual_callable_type->getTemplateMap();
-        }
-
         return $contextual_callable_type->return_type;
     }
 

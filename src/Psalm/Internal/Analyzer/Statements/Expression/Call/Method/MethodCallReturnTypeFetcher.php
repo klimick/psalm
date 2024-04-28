@@ -575,10 +575,6 @@ final class MethodCallReturnTypeFetcher
                             [$template_type->defining_class],
                     )
                 ) {
-                    if ($template_type->defining_class === 'anonymous-fn') {
-                        continue;
-                    }
-
                     if ($template_type->param_name === 'TFunctionArgCount') {
                         $template_result->lower_bounds[$template_type->param_name] = [
                             'fn-' . $method_id->method_name => [
