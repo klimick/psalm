@@ -64,7 +64,8 @@ final class ArgumentsTemplateResultCollector
         $codebase = $statements_analyzer->getCodebase();
 
         if ($function_like_storage instanceof MethodStorage
-            && $function_like_storage->defining_fqcln
+            && $function_like_storage->defining_fqcln !== null
+            && $function_like_storage->defining_fqcln !== ''
         ) {
             $classlike_storage = $codebase->classlikes->getStorageFor($function_like_storage->defining_fqcln);
 
@@ -214,7 +215,7 @@ final class ArgumentsTemplateResultCollector
             return [];
         }
 
-        $method_template_result = new TemplateResult($function_like_storage->template_types ?: [], []);
+        $method_template_result = new TemplateResult($function_like_storage->template_types ?? [], []);
 
         TemplateStandinTypeReplacer::fillTemplateResult(
             $function_like_storage->if_this_is_type,

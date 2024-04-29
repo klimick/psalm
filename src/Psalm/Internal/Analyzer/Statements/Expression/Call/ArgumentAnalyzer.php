@@ -863,7 +863,7 @@ final class ArgumentAnalyzer
                                 $statements_analyzer->getFilePath(),
                             );
                         } elseif ($input_atomic_type instanceof TLiteralString
-                            && strpos($input_atomic_type->value, '::')
+                            && str_contains($input_atomic_type->value, '::')
                         ) {
                             $parts = explode('::', $input_atomic_type->value);
                             $potential_method_id = new MethodIdentifier(

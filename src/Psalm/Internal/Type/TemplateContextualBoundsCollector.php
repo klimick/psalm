@@ -111,7 +111,7 @@ final class TemplateContextualBoundsCollector
             && $this->codebase->classOrInterfaceExists($return_atomic->value)
             && $this->codebase->methodExists($return_atomic->value . '::__invoke')
         ) {
-            $return_atomic = CallableTypeComparator::getCallableFromInvokable(
+            $return_atomic = CallableTypeComparator::getCallableFromAtomic(
                 $this->codebase,
                 $return_atomic,
             );
