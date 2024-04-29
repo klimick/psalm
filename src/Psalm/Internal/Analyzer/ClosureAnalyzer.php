@@ -6,7 +6,6 @@ namespace Psalm\Internal\Analyzer;
 
 use PhpParser;
 use Psalm\CodeLocation;
-use Psalm\Codebase;
 use Psalm\Context;
 use Psalm\Internal\Codebase\VariableUseGraph;
 use Psalm\Internal\DataFlow\DataFlowNode;
@@ -18,6 +17,8 @@ use Psalm\Issue\DuplicateParam;
 use Psalm\Issue\PossiblyUndefinedVariable;
 use Psalm\Issue\UndefinedVariable;
 use Psalm\IssueBuffer;
+use Psalm\Storage\FunctionStorage;
+use Psalm\Storage\MethodStorage;
 use Psalm\Storage\UnserializeMemoryUsageSuppressionTrait;
 use Psalm\Type;
 use Psalm\Type\Atomic\TNamedObject;
@@ -369,6 +370,8 @@ final class ClosureAnalyzer extends FunctionLikeAnalyzer
             $closure_analyzer->getClosureId(),
         );
 
+        $possible_template_definers = self::getPossibleTemplateDefiners($statements_analyzer);
+
         foreach ($calling_closure_storage->params as $param_index => $calling_param) {
             $contextual_param_type = $contextual_callable_type->params[$param_index]->type ?? null;
 
@@ -382,24 +385,36 @@ final class ClosureAnalyzer extends FunctionLikeAnalyzer
                 continue;
             }
 
-            $contextual_param_type = self::expandContextualType($codebase, $context, $contextual_param_type);
+            $expanded_contextual_param_type = TypeExpander::expandUnion(
+                codebase: $codebase,
+                return_type: $contextual_param_type,
+                self_class: null,
+                static_class_type: null,
+                parent_class: null,
+                expand_templates: true,
+                do_not_expand_template_defined_at: $possible_template_definers,
+            );
+
+            if ($calling_param->type === null) {
+                $calling_param->type = $expanded_contextual_param_type;
+                $calling_param->type_inferred = true;
+
+                continue;
+            }
+
             $type_comparison_result = new TypeComparisonResult();
 
-            if ($calling_param->type === null
-                || UnionTypeComparator::isContainedBy(
-                    $codebase,
-                    $contextual_param_type,
-                    $calling_param->type,
-                    false,
-                    false,
-                    $type_comparison_result,
-                )
-            ) {
+            if (UnionTypeComparator::isContainedBy(
+                codebase: $codebase,
+                input_type: $expanded_contextual_param_type,
+                container_type: $calling_param->type,
+                union_comparison_result: $type_comparison_result,
+            )) {
                 if ($type_comparison_result->to_string_cast) {
                     continue;
                 }
 
-                $calling_param->type = $contextual_param_type;
+                $calling_param->type = $expanded_contextual_param_type;
                 $calling_param->type_inferred = true;
             }
         }
@@ -407,24 +422,36 @@ final class ClosureAnalyzer extends FunctionLikeAnalyzer
         return $contextual_callable_type->return_type;
     }
 
-    private static function expandContextualType(Codebase $codebase, Context $context, Union $contextual_type): Union
+    /**
+     * @return array<string, true>
+     */
+    private static function getPossibleTemplateDefiners(StatementsAnalyzer $statements_analyzer): array
     {
-        $expand_templates = true;
-        $do_not_expand_template_defined_at = $context->getPossibleTemplateDefiners();
+        do {
+            $statements_analyzer = $statements_analyzer->getSource();
 
-        return TypeExpander::expandUnion(
-            $codebase,
-            $contextual_type,
-            null,
-            null,
-            null,
-            true,
-            false,
-            false,
-            false,
-            $expand_templates,
-            false,
-            $do_not_expand_template_defined_at,
-        );
+            if ($statements_analyzer instanceof FunctionAnalyzer
+                && $statements_analyzer->storage instanceof FunctionStorage
+            ) {
+                $function_name = $statements_analyzer->storage->cased_name;
+
+                return $function_name !== null
+                    ? ['fn-' . strtolower($function_name) => true]
+                    : [];
+            }
+
+            if ($statements_analyzer instanceof MethodAnalyzer
+                && $statements_analyzer->storage instanceof MethodStorage
+            ) {
+                $class_name = $statements_analyzer->storage->defining_fqcln;
+                $method_name = $statements_analyzer->storage->cased_name;
+
+                return $class_name !== null && $method_name !== null
+                    ? ['fn-' . strtolower($class_name).'::'.strtolower($method_name) => true, $class_name => true]
+                    : [];
+            }
+        } while (!$statements_analyzer instanceof FileAnalyzer);
+
+        return [];
     }
 }
