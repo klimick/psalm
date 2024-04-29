@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<files psalm-version="dev-master@c488d40e6243536a42608bbe37245f07ebebe1ad">
+<files psalm-version="dev-master@702a804a5c1eeea5bea9f44536e246f50ce96979">
   <file src="examples/TemplateChecker.php">
     <PossiblyUndefinedIntArrayOffset>
       <code><![CDATA[$comment_block->tags['variablesfrom'][0]]]></code>
@@ -656,7 +656,6 @@
       <code><![CDATA[$context->calling_method_id]]></code>
       <code><![CDATA[$self_fq_class_name]]></code>
       <code><![CDATA[$static_fq_class_name]]></code>
-      <code><![CDATA[strpos($atomic_type->value, '::')]]></code>
       <code><![CDATA[strpos($input_type_part->value, '::')]]></code>
     </RiskyTruthyFalsyComparison>
   </file>
@@ -669,7 +668,6 @@
       <code><![CDATA[$cased_method_id]]></code>
       <code><![CDATA[$cased_method_id]]></code>
       <code><![CDATA[$cased_method_id]]></code>
-      <code><![CDATA[$context->calling_method_id]]></code>
       <code><![CDATA[$context->calling_method_id]]></code>
       <code><![CDATA[$context->calling_method_id]]></code>
       <code><![CDATA[$context->calling_method_id]]></code>
@@ -767,12 +765,9 @@
   </file>
   <file src="src/Psalm/Internal/Analyzer/Statements/Expression/Call/Method/ExistingAtomicMethodCallAnalyzer.php">
     <RiskyTruthyFalsyComparison>
-      <code><![CDATA[$class_template_params]]></code>
       <code><![CDATA[$context->calling_method_id]]></code>
       <code><![CDATA[$context->calling_method_id]]></code>
       <code><![CDATA[$lhs_var_id]]></code>
-      <code><![CDATA[$method_storage->template_types]]></code>
-      <code><![CDATA[$method_storage->template_types]]></code>
     </RiskyTruthyFalsyComparison>
   </file>
   <file src="src/Psalm/Internal/Analyzer/Statements/Expression/Call/Method/MethodCallProhibitionAnalyzer.php">
@@ -800,12 +795,6 @@
   </file>
   <file src="src/Psalm/Internal/Analyzer/Statements/Expression/Call/Method/MissingMethodCallHandler.php">
     <RiskyTruthyFalsyComparison>
-      <code><![CDATA[$found_generic_params]]></code>
-      <code><![CDATA[$found_generic_params]]></code>
-      <code><![CDATA[$found_generic_params]]></code>
-      <code><![CDATA[$found_generic_params]]></code>
-      <code><![CDATA[$found_generic_params]]></code>
-      <code><![CDATA[$found_generic_params]]></code>
       <code><![CDATA[$intersection_method_id]]></code>
       <code><![CDATA[$intersection_method_id]]></code>
     </RiskyTruthyFalsyComparison>
@@ -875,10 +864,6 @@
       <code><![CDATA[!$context->self]]></code>
       <code><![CDATA[$context->self]]></code>
       <code><![CDATA[$context->self]]></code>
-      <code><![CDATA[$context->self]]></code>
-      <code><![CDATA[$found_generic_params]]></code>
-      <code><![CDATA[$found_generic_params]]></code>
-      <code><![CDATA[$self_class_storage->template_extended_params]]></code>
     </RiskyTruthyFalsyComparison>
   </file>
   <file src="src/Psalm/Internal/Analyzer/Statements/Expression/CallAnalyzer.php">
@@ -1055,10 +1040,7 @@
       <code><![CDATA[$method_name]]></code>
     </PossiblyUndefinedIntArrayOffset>
     <RiskyTruthyFalsyComparison>
-      <code><![CDATA[!$context->calling_function_id]]></code>
-      <code><![CDATA[!$context->calling_method_id]]></code>
       <code><![CDATA[!$var_comment->var_id]]></code>
-      <code><![CDATA[$context->calling_function_id]]></code>
       <code><![CDATA[$context->self]]></code>
       <code><![CDATA[$found_generic_params]]></code>
       <code><![CDATA[$var_comment->line_number]]></code>
@@ -1458,10 +1440,6 @@
     </RiskyTruthyFalsyComparison>
   </file>
   <file src="src/Psalm/Internal/PhpVisitor/Reflector/ClassLikeNodeScanner.php">
-    <PossiblyUndefinedIntArrayOffset>
-      <code><![CDATA[$l[4]]]></code>
-      <code><![CDATA[$r[4]]]></code>
-    </PossiblyUndefinedIntArrayOffset>
     <RiskyTruthyFalsyComparison>
       <code><![CDATA[!$var_line_parts]]></code>
       <code><![CDATA[$adaptation->newModifier]]></code>
