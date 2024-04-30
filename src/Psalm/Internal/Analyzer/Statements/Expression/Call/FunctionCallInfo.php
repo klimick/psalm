@@ -6,7 +6,7 @@ namespace Psalm\Internal\Analyzer\Statements\Expression\Call;
 
 use PhpParser;
 use Psalm\Storage\FunctionLikeParameter;
-use Psalm\Storage\FunctionLikeStorage;
+use Psalm\Storage\FunctionStorage;
 use Psalm\Type\Union;
 
 /**
@@ -37,7 +37,7 @@ final class FunctionCallInfo
      */
     public ?array $function_params = null;
 
-    public ?FunctionLikeStorage $function_storage = null;
+    public ?FunctionStorage $function_storage = null;
 
     public ?PhpParser\Node\Name $new_function_name = null;
 
