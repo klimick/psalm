@@ -11,8 +11,8 @@ use Psalm\Context;
 use Psalm\FileManipulation;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentMapPopulator;
-use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CreateTemplateResult;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\FunctionCallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\ExpressionIdentifier;
@@ -172,12 +172,14 @@ final class ExistingAtomicMethodCallAnalyzer extends CallAnalyzer
             $method_storage = null;
         }
 
-        $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
+        $collected_argument_templates = CreateTemplateResult::forMethod(
             $stmt,
             $context,
+            $codebase,
             $statements_analyzer,
-            $method_storage,
             $lhs_type_part,
+            $method_storage,
+            $class_storage,
         );
 
         $template_result = new TemplateResult(
