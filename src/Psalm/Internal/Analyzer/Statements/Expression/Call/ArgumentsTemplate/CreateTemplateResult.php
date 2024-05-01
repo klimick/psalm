@@ -17,8 +17,8 @@ use Psalm\Internal\MethodIdentifier;
 use Psalm\Internal\Type\TemplateResult;
 use Psalm\Internal\Type\TemplateStandinTypeReplacer;
 use Psalm\Storage\ClassLikeStorage;
-use Psalm\Storage\FunctionStorage;
 use Psalm\Storage\MethodStorage;
+use Psalm\Type\Atomic;
 use Psalm\Type\Atomic\TClosure;
 use Psalm\Type\Atomic\TNamedObject;
 use Psalm\Type\Atomic\TTemplateParam;
@@ -33,31 +33,23 @@ use function strtolower;
  */
 final class CreateTemplateResult
 {
-    /**
-     * @psalm-suppress PossiblyUnusedMethod
-     */
-    public static function forFunction(?FunctionStorage $storage): CollectedArgumentTemplates
-    {
-        return new CollectedArgumentTemplates(
-            template_types: $storage->template_types ?? [],
-            lower_bounds: [],
-        );
-    }
-
     public static function forMethod(
         CallLike $stmt,
         Context $context,
         Codebase $codebase,
         StatementsAnalyzer $statements_analyzer,
-        TNamedObject $lhs_type_part,
+        Atomic $lhs_type_part,
         ?MethodStorage $method_storage,
         ClassLikeStorage $class_storage,
     ): CollectedArgumentTemplates {
-        if ($method_storage === null || $method_storage->defining_fqcln === null) {
+        if (!$lhs_type_part instanceof TNamedObject || $lhs_type_part instanceof TClosure) {
             return new CollectedArgumentTemplates();
         }
 
-        if ($lhs_type_part instanceof TClosure || $method_storage->cased_name === null) {
+        if ($method_storage === null ||
+            $method_storage->cased_name === null ||
+            $method_storage->defining_fqcln === null
+        ) {
             return new CollectedArgumentTemplates();
         }
 

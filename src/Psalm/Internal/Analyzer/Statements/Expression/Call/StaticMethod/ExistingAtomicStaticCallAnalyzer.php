@@ -12,8 +12,8 @@ use Psalm\Config;
 use Psalm\Context;
 use Psalm\FileManipulation;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
-use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CreateTemplateResult;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\Method\MethodCallProhibitionAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\StaticCallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
@@ -146,12 +146,14 @@ final class ExistingAtomicStaticCallAnalyzer
 
         $method_storage = $codebase->methods->getUserMethodStorage($method_id);
 
-        $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
+        $collected_argument_templates = CreateTemplateResult::forMethod(
             $stmt,
             $context,
+            $codebase,
             $statements_analyzer,
-            $method_storage,
             $lhs_type_part,
+            $method_storage,
+            $class_storage,
         );
 
         $was_contextual_type_resolver = $context->contextual_type_resolver;

@@ -12,8 +12,8 @@ use Psalm\Internal\Algebra;
 use Psalm\Internal\Algebra\FormulaGenerator;
 use Psalm\Internal\Analyzer\AlgebraAnalyzer;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
-use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CollectedArgumentTemplates;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
 use Psalm\Internal\Analyzer\Statements\ExpressionAnalyzer;
 use Psalm\Internal\Analyzer\StatementsAnalyzer;
@@ -169,11 +169,9 @@ final class FunctionCallAnalyzer extends CallAnalyzer
             $set_inside_conditional = true;
         }
 
-        $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
-            $stmt,
-            $context,
-            $statements_analyzer,
-            $function_call_info->function_storage,
+        $collected_argument_templates = new CollectedArgumentTemplates(
+            template_types: $function_call_info->function_storage->template_types ?? [],
+            lower_bounds: [],
         );
 
         $was_contextual_resolver = $context->contextual_type_resolver;

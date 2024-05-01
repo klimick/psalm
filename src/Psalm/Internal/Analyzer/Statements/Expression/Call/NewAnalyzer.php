@@ -13,8 +13,8 @@ use Psalm\Internal\Analyzer\ClassAnalyzer;
 use Psalm\Internal\Analyzer\ClassLikeAnalyzer;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
 use Psalm\Internal\Analyzer\NamespaceAnalyzer;
-use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\ArgumentsTemplateResultCollector;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CallLikeContextualTypeExtractor;
+use Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate\CollectedArgumentTemplates;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\Method\MethodCallReturnTypeFetcher;
 use Psalm\Internal\Analyzer\Statements\Expression\Call\Method\MethodVisibilityAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
@@ -418,11 +418,9 @@ final class NewAnalyzer extends CallAnalyzer
                 ? $codebase->methods->getStorage($declaring_method_id)
                 : null;
 
-            $collected_argument_templates = ArgumentsTemplateResultCollector::collect(
-                $stmt,
-                $context,
-                $statements_analyzer,
-                $method_storage,
+            $collected_argument_templates = new CollectedArgumentTemplates(
+                template_types: $storage->template_types ?? [],
+                lower_bounds: [],
             );
 
             $was_contextual_type_resolver = $context->contextual_type_resolver;
