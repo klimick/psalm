@@ -42,7 +42,8 @@ final class CreateTemplateResult
     ): CollectedArgumentTemplates {
         if ($method_storage === null ||
             $method_storage->cased_name === null ||
-            $method_storage->defining_fqcln === null
+            $method_storage->defining_fqcln === null ||
+            $method_storage->defining_fqcln === ''
         ) {
             return new CollectedArgumentTemplates();
         }
@@ -139,7 +140,7 @@ final class CreateTemplateResult
 
     /**
      * @param lowercase-string $method_name_lc
-     * @return array<string, non-empty-array<string, Union>>
+     * @return ?array<string, non-empty-array<string, Union>>
      */
     private static function getTraitLowerBounds(
         ClassLikeStorage $static_class_storage,
@@ -177,7 +178,7 @@ final class CreateTemplateResult
             method_name: $method_name_lc,
             lhs_type_part: $lhs_type_part,
             self_call: true,
-        ) ?? [];
+        );
     }
 
     /**
