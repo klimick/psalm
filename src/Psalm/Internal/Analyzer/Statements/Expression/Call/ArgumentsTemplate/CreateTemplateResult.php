@@ -19,8 +19,6 @@ use Psalm\Internal\Type\TemplateStandinTypeReplacer;
 use Psalm\Storage\ClassLikeStorage;
 use Psalm\Storage\MethodStorage;
 use Psalm\Type\Atomic;
-use Psalm\Type\Atomic\TClosure;
-use Psalm\Type\Atomic\TNamedObject;
 use Psalm\Type\Atomic\TTemplateParam;
 use Psalm\Type\Union;
 
@@ -42,10 +40,6 @@ final class CreateTemplateResult
         ?MethodStorage $method_storage,
         ClassLikeStorage $class_storage,
     ): CollectedArgumentTemplates {
-        if (!$lhs_type_part instanceof TNamedObject || $lhs_type_part instanceof TClosure) {
-            return new CollectedArgumentTemplates();
-        }
-
         if ($method_storage === null ||
             $method_storage->cased_name === null ||
             $method_storage->defining_fqcln === null
@@ -150,7 +144,7 @@ final class CreateTemplateResult
     private static function getTraitLowerBounds(
         ClassLikeStorage $static_class_storage,
         StatementsAnalyzer $statements_analyzer,
-        TNamedObject $lhs_type_part,
+        Atomic $lhs_type_part,
         string $method_name_lc,
     ): ?array {
         $parent_source = $statements_analyzer->getSource();
@@ -192,7 +186,7 @@ final class CreateTemplateResult
     private static function getIfThisIsTypeLowerBounds(
         StatementsAnalyzer $statements_analyzer,
         MethodStorage $method_storage,
-        TNamedObject $lhs_type_part,
+        Atomic $lhs_type_part,
     ): array {
         if ($method_storage->if_this_is_type === null) {
             return [];
