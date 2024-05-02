@@ -161,18 +161,16 @@ final class CreateTemplateResult
         $codebase = $statements_analyzer->getCodebase();
         $trait_storage = $codebase->classlike_storage_provider->get($grandparent_source->getFQCLN());
 
-        if (!isset($trait_storage->methods[$method_name_lc])) {
-            return null;
-        }
-
-        return ClassTemplateParamCollector::collect(
-            codebase: $codebase,
-            class_storage: $trait_storage,
-            static_class_storage: $static_class_storage,
-            method_name: $method_name_lc,
-            lhs_type_part: $lhs_type_part,
-            self_call: true,
-        );
+        return isset($trait_storage->methods[$method_name_lc])
+            ? ClassTemplateParamCollector::collect(
+                codebase: $codebase,
+                class_storage: $trait_storage,
+                static_class_storage: $static_class_storage,
+                method_name: $method_name_lc,
+                lhs_type_part: $lhs_type_part,
+                self_call: true,
+            )
+            : null;
     }
 
     /**
