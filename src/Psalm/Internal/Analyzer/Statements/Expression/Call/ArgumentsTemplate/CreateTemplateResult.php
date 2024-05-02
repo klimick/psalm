@@ -85,7 +85,12 @@ final class CreateTemplateResult
                 $method_storage->template_types ?? [],
             ),
             lower_bounds: array_merge(
-                self::withParent($codebase, $context, $stmt, $class_lower_bounds),
+                self::isParentCall($stmt, $context)
+                    ? self::mapSelfBoundsToParentBounds(
+                        self_class_storage: $codebase->classlike_storage_provider->get($context->self),
+                        self_bounds: $class_lower_bounds,
+                    )
+                    : $class_lower_bounds,
                 self::getIfThisIsTypeLowerBounds($statements_analyzer, $method_storage, $lhs_type_part),
             ),
         );
@@ -106,36 +111,41 @@ final class CreateTemplateResult
     }
 
     /**
-     * @param array<string, non-empty-array<string, Union>> $lower_bounds
-     * @return array<string, non-empty-array<string, Union>>
+     * @psalm-assert-if-true string $context->self
      */
-    private static function withParent(Codebase $codebase, Context $context, CallLike $stmt, array $lower_bounds): array
+    private static function isParentCall(CallLike $stmt, Context $context): bool
     {
-        $parent_call = $stmt instanceof StaticCall
+        return $context->self !== null
+            && $stmt instanceof StaticCall
             && $stmt->class instanceof Name
             && $stmt->class->getParts() === ['parent'];
+    }
 
-        $template_extended_params = $parent_call && $context->self !== null
-            ? $codebase->classlike_storage_provider->get($context->self)->template_extended_params ?? []
-            : [];
+    /**
+     * @param array<string, non-empty-array<string, Union>> $self_bounds
+     * @return array<string, non-empty-array<string, Union>>
+     */
+    private static function mapSelfBoundsToParentBounds(ClassLikeStorage $self_class_storage, array $self_bounds): array
+    {
+        $parent_bounds = $self_bounds;
 
-        foreach ($template_extended_params as $template_fq_class_name => $extended_types) {
+        foreach ($self_class_storage->template_extended_params ?? [] as $template_fq_class_name => $extended_types) {
             foreach ($extended_types as $type_key => $extended_type) {
-                if (isset($lower_bounds[$type_key][$template_fq_class_name])) {
-                    $lower_bounds[$type_key][$template_fq_class_name] = $extended_type;
+                if (isset($parent_bounds[$type_key][$template_fq_class_name])) {
+                    $parent_bounds[$type_key][$template_fq_class_name] = $extended_type;
                     continue;
                 }
 
                 foreach ($extended_type->getAtomicTypes() as $t) {
-                    $lower_bounds[$type_key][$template_fq_class_name] =
-                        $t instanceof TTemplateParam && isset($lower_bounds[$t->param_name][$t->defining_class])
-                            ? $lower_bounds[$t->param_name][$t->defining_class]
+                    $parent_bounds[$type_key][$template_fq_class_name] =
+                        $t instanceof TTemplateParam && isset($parent_bounds[$t->param_name][$t->defining_class])
+                            ? $parent_bounds[$t->param_name][$t->defining_class]
                             : $extended_type;
                 }
             }
         }
 
-        return $lower_bounds;
+        return $parent_bounds;
     }
 
     /**
