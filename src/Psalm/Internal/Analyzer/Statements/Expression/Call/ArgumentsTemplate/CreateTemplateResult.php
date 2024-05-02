@@ -51,7 +51,8 @@ final class CreateTemplateResult
         $method_name_lc = strtolower($method_storage->cased_name);
         $self_call = !$statements_analyzer->isStatic() && $class_storage->name === $context->self;
 
-        if ($self_call) {
+        /** @psalm-suppress TypeDoesNotContainType */
+        if ($self_call && false) {
             $trait_lower_bounds = self::getTraitLowerBounds(
                 static_class_storage: $class_storage,
                 statements_analyzer: $statements_analyzer,
