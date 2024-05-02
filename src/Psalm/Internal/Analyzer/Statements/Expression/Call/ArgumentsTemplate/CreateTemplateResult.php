@@ -158,10 +158,8 @@ final class CreateTemplateResult
             return null;
         }
 
-        $fq_trait_name_lc = strtolower($grandparent_source->getFQCLN());
-
         $codebase = $statements_analyzer->getCodebase();
-        $trait_storage = $codebase->classlike_storage_provider->get($fq_trait_name_lc);
+        $trait_storage = $codebase->classlike_storage_provider->get($grandparent_source->getFQCLN());
 
         if (!isset($trait_storage->methods[$method_name_lc])) {
             return null;
