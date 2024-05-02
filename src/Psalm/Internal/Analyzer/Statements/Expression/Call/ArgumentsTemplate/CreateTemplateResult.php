@@ -72,7 +72,9 @@ final class CreateTemplateResult
 
         $class_lower_bounds = ClassTemplateParamCollector::collect(
             codebase: $codebase,
-            class_storage: self::getDeclaringClassStorage($codebase, $method_storage->defining_fqcln, $method_name_lc),
+            class_storage: $codebase->methods->getClassLikeStorageForMethod(
+                new MethodIdentifier($method_storage->defining_fqcln, $method_name_lc),
+            ),
             static_class_storage: $class_storage,
             method_name: $method_name_lc,
             lhs_type_part: $lhs_type_part,
@@ -94,20 +96,6 @@ final class CreateTemplateResult
                 self::getIfThisIsTypeLowerBounds($statements_analyzer, $method_storage, $lhs_type_part),
             ),
         );
-    }
-
-    /**
-     * @param lowercase-string $method_name_lc
-     */
-    private static function getDeclaringClassStorage(
-        Codebase $codebase,
-        string $defining_fqcln,
-        string $method_name_lc,
-    ): ClassLikeStorage {
-        $method_id = new MethodIdentifier($defining_fqcln, $method_name_lc);
-        $declaring_method_id = $codebase->methods->getDeclaringMethodId($method_id) ?? $method_id;
-
-        return $codebase->methods->getClassLikeStorageForMethod($declaring_method_id);
     }
 
     /**
