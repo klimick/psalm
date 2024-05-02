@@ -167,11 +167,9 @@ final class CreateTemplateResult
             return null;
         }
 
-        $trait_method_id = new MethodIdentifier($trait_storage->name, $method_name_lc);
-
         return ClassTemplateParamCollector::collect(
             codebase: $codebase,
-            class_storage: $codebase->methods->getClassLikeStorageForMethod($trait_method_id),
+            class_storage: $trait_storage,
             static_class_storage: $static_class_storage,
             method_name: $method_name_lc,
             lhs_type_part: $lhs_type_part,
