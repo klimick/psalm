@@ -6,6 +6,7 @@ namespace Psalm\Internal\Type;
 
 use Psalm\Codebase;
 use Psalm\Internal\Type\Comparator\CallableTypeComparator;
+use Psalm\Type;
 use Psalm\Type\Atomic;
 use Psalm\Type\Atomic\TArray;
 use Psalm\Type\Atomic\TCallable;
@@ -162,7 +163,7 @@ final class TemplateContextualBoundsCollector
                 $this->collectUnion($contextual_atomic->fallback_params[0], $return_atomic->fallback_params[0]);
                 $this->collectUnion($contextual_atomic->fallback_params[1], $return_atomic->fallback_params[1]);
             }
-        } elseif ($return_atomic instanceof TArray) {
+        } elseif ($return_atomic instanceof TArray || $return_atomic instanceof TIterable) {
             $this->collectUnion($contextual_atomic->getGenericKeyType(), $return_atomic->type_params[0]);
             $this->collectUnion($contextual_atomic->getGenericValueType(), $return_atomic->type_params[1]);
         }
@@ -198,6 +199,15 @@ final class TemplateContextualBoundsCollector
                 $template_result,
                 $this->codebase,
             );
+        }
+
+        if ($return_atomic instanceof TIterable
+            && $contextual_atomic->value === 'Generator'
+        ) {
+            $this->collectAtomic(new TIterable([
+                $contextual_atomic->type_params[0] ?? Type::getMixed(),
+                $contextual_atomic->type_params[1] ?? Type::getMixed(),
+            ]), $return_atomic);
         }
 
         if ($return_atomic instanceof TGenericObject
