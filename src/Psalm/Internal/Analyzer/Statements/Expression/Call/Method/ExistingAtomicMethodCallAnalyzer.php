@@ -206,7 +206,7 @@ final class ExistingAtomicMethodCallAnalyzer extends CallAnalyzer
             $was_contextual_type_resolver = $context->contextual_type_resolver;
             $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
                 $context,
-                $codebase,
+                $statements_analyzer,
                 $method_storage,
                 $collected_argument_templates,
             );

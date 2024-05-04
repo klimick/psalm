@@ -156,7 +156,7 @@ final class ReturnAnalyzer
                 ? new ContextualTypeResolver(
                     $next_contextual_type,
                     new TemplateResult([], []),
-                    $codebase,
+                    $statements_analyzer,
                 )
                 : null;
 

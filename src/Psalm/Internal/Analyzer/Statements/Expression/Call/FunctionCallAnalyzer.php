@@ -178,7 +178,7 @@ final class FunctionCallAnalyzer extends CallAnalyzer
 
         $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
             $context,
-            $codebase,
+            $statements_analyzer,
             $function_call_info->function_storage,
             $collected_argument_templates,
         );

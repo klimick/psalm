@@ -133,7 +133,7 @@ final class MissingMethodCallHandler
             $was_contextual_type_resolver = $context->contextual_type_resolver;
             $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
                 $context,
-                $codebase,
+                $statements_analyzer,
                 $pseudo_method_storage,
                 $collected_argument_templates,
             );
@@ -310,7 +310,7 @@ final class MissingMethodCallHandler
             $was_contextual_type_resolver = $context->contextual_type_resolver;
             $context->contextual_type_resolver = CallLikeContextualTypeExtractor::extract(
                 $context,
-                $codebase,
+                $statements_analyzer,
                 $pseudo_method_storage,
                 $collected_argument_templates,
             );

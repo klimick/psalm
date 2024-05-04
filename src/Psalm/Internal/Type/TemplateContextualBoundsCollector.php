@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Psalm\Internal\Type;
 
-use Psalm\Codebase;
+use Psalm\Internal\Analyzer\StatementsAnalyzer;
 use Psalm\Internal\Type\Comparator\CallableTypeComparator;
 use Psalm\Type;
 use Psalm\Type\Atomic;
@@ -25,21 +25,16 @@ use function array_map;
  */
 final class TemplateContextualBoundsCollector
 {
-    private Codebase $codebase;
-
     /** @var array<string, non-empty-array<string, non-empty-list<Atomic>>> */
     private array $collected_atomics = [];
-
-    /** @var array<string, non-empty-array<string, Union>> */
-    private array $template_types;
 
     /**
      * @param array<string, non-empty-array<string, Union>> $template_types
      */
-    private function __construct(Codebase $codebase, array $template_types)
-    {
-        $this->codebase = $codebase;
-        $this->template_types = $template_types;
+    private function __construct(
+        private readonly StatementsAnalyzer $statements_analyzer,
+        private readonly array $template_types,
+    ) {
     }
 
     /**
@@ -47,13 +42,15 @@ final class TemplateContextualBoundsCollector
      * @return array<string, non-empty-array<string, Union>>
      */
     public static function collect(
-        Codebase $codebase,
+        StatementsAnalyzer $statements_analyzer,
         Union $contextual_type,
         Union $return_type,
         array $template_types,
     ): array {
-        $collector = new self($codebase, $template_types);
+        $collector = new self($statements_analyzer, $template_types);
         $collector->collectUnion($contextual_type, $return_type);
+
+        $codebase = $statements_analyzer->getCodebase();
 
         return array_map(
             static fn(array $template_map): array => array_map(
@@ -107,15 +104,14 @@ final class TemplateContextualBoundsCollector
      */
     private function collectCallable(Atomic $contextual_atomic, Atomic $return_atomic): void
     {
+        $codebase = $this->statements_analyzer->getCodebase();
+
         if ($return_atomic instanceof TNamedObject
             && $return_atomic->value !== 'Closure'
-            && $this->codebase->classOrInterfaceExists($return_atomic->value)
-            && $this->codebase->methodExists($return_atomic->value . '::__invoke')
+            && $codebase->classOrInterfaceExists($return_atomic->value)
+            && $codebase->methodExists($return_atomic->value . '::__invoke')
         ) {
-            $return_atomic = CallableTypeComparator::getCallableFromAtomic(
-                $this->codebase,
-                $return_atomic,
-            );
+            $return_atomic = CallableTypeComparator::getCallableFromAtomic($codebase, $return_atomic);
         }
 
         if ($return_atomic instanceof TCallable || $return_atomic instanceof TClosure) {
@@ -171,12 +167,14 @@ final class TemplateContextualBoundsCollector
 
     private function collectGenericObject(TGenericObject $contextual_atomic, Atomic $return_atomic): void
     {
+        $codebase = $this->statements_analyzer->getCodebase();
+
         if ($return_atomic instanceof TGenericObject
-            && $this->codebase->classExists($return_atomic->value)
-            && $this->codebase->classExtends($return_atomic->value, $contextual_atomic->value)
+            && $codebase->classExists($return_atomic->value)
+            && $codebase->classExtends($return_atomic->value, $contextual_atomic->value)
         ) {
-            $contextual_storage = $this->codebase->classlike_storage_provider->get($contextual_atomic->value);
-            $return_storage = $this->codebase->classlike_storage_provider->get($return_atomic->value);
+            $contextual_storage = $codebase->classlike_storage_provider->get($contextual_atomic->value);
+            $return_storage = $codebase->classlike_storage_provider->get($return_atomic->value);
 
             $contextual_raw_atomic = $contextual_storage->getNamedObjectAtomic();
             $return_raw_atomic = $return_storage->getNamedObjectAtomic();
@@ -190,15 +188,12 @@ final class TemplateContextualBoundsCollector
             TemplateStandinTypeReplacer::fillTemplateResult(
                 new Union([$contextual_raw_atomic]),
                 $template_result,
-                $this->codebase,
-                null,
+                $codebase,
+                $this->statements_analyzer,
                 new Union([$return_raw_atomic]),
             );
 
-            $return_atomic = $contextual_raw_atomic->replaceTemplateTypesWithArgTypes(
-                $template_result,
-                $this->codebase,
-            );
+            $return_atomic = $contextual_raw_atomic->replaceTemplateTypesWithArgTypes($template_result, $codebase);
         }
 
         if ($return_atomic instanceof TIterable

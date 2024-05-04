@@ -7,6 +7,7 @@ namespace Psalm\Internal\Analyzer\Statements\Expression\Call\ArgumentsTemplate;
 use Psalm\Codebase;
 use Psalm\Context;
 use Psalm\ContextualTypeResolver;
+use Psalm\Internal\Analyzer\StatementsAnalyzer;
 use Psalm\Internal\Type\TemplateContextualBoundsCollector;
 use Psalm\Internal\Type\TemplateResult;
 use Psalm\Storage\FunctionLikeStorage;
@@ -23,7 +24,7 @@ final class CallLikeContextualTypeExtractor
 {
     public static function extract(
         Context $context,
-        Codebase $codebase,
+        StatementsAnalyzer $statements_analyzer,
         ?FunctionLikeStorage $function_storage,
         CollectedArgumentTemplates $collected_templates,
     ): ContextualTypeResolver {
@@ -38,12 +39,12 @@ final class CallLikeContextualTypeExtractor
             return new ContextualTypeResolver(
                 $empty_contextual_type,
                 $template_result_without_contextual_bounds,
-                $codebase,
+                $statements_analyzer,
             );
         }
 
         $return_type = $function_storage->return_type
-            ?? self::getReturnTypeFromDeclaringConstructor($codebase, $function_storage);
+            ?? self::getReturnTypeFromDeclaringConstructor($statements_analyzer->getCodebase(), $function_storage);
 
         if ($return_type === null) {
             $template_result_without_contextual_bounds = new TemplateResult(
@@ -54,14 +55,14 @@ final class CallLikeContextualTypeExtractor
             return new ContextualTypeResolver(
                 $empty_contextual_type,
                 $template_result_without_contextual_bounds,
-                $codebase,
+                $statements_analyzer,
             );
         }
 
         $template_result_with_contextual_bounds = new TemplateResult(
             $collected_templates->template_types,
             array_merge($collected_templates->lower_bounds, TemplateContextualBoundsCollector::collect(
-                $codebase,
+                $statements_analyzer,
                 $context->contextual_type_resolver->resolve(),
                 $return_type,
                 $collected_templates->template_types,
@@ -71,7 +72,7 @@ final class CallLikeContextualTypeExtractor
         return new ContextualTypeResolver(
             $return_type,
             $template_result_with_contextual_bounds,
-            $codebase,
+            $statements_analyzer,
         );
     }
 
