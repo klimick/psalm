@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Psalm\Internal\Analyzer\Statements\Expression;
 
+use Psalm\Codebase;
 use Psalm\ContextualTypeResolver;
 use Psalm\Type\Atomic\TArray;
 use Psalm\Type\Atomic\TKeyedArray;
@@ -17,9 +18,9 @@ final class ArrayAnalyzerContextualTypeExtractor
 {
     public static function extract(
         Union $array_key_type,
+        Codebase $codebase,
         ContextualTypeResolver $contextual_type_resolver,
     ): ?ContextualTypeResolver {
-        $codebase = $contextual_type_resolver->getCodebase();
         $contextual_type = $contextual_type_resolver->resolve();
 
         if (!$contextual_type->hasArray()) {

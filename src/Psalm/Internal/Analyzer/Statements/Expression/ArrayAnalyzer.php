@@ -370,6 +370,7 @@ final class ArrayAnalyzer
         $context->contextual_type_resolver = $context->contextual_type_resolver !== null
             ? ArrayAnalyzerContextualTypeExtractor::extract(
                 $item_key_type ?? Type::getInt(false, $array_creation_info->int_offset),
+                $codebase,
                 $context->contextual_type_resolver,
             )
             : null;

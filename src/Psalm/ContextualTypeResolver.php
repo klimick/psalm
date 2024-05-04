@@ -25,11 +25,6 @@ final class ContextualTypeResolver
         $this->codebase = $codebase;
     }
 
-    public function getCodebase(): Codebase
-    {
-        return $this->codebase;
-    }
-
     /**
      * @return ($type is Union ? self : null)
      */
