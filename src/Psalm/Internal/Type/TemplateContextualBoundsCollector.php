@@ -193,13 +193,15 @@ final class TemplateContextualBoundsCollector
         if ($return_atomic instanceof TIterable
             && $contextual_atomic->value === 'Generator'
         ) {
-            $this->collectAtomic(new TIterable([
+            $this->collectUnion(
                 $contextual_atomic->type_params[0] ?? Type::getMixed(),
+                $return_atomic->type_params[0],
+            );
+            $this->collectUnion(
                 $contextual_atomic->type_params[1] ?? Type::getMixed(),
-            ]), $return_atomic);
-        }
-
-        if ($return_atomic instanceof TGenericObject
+                $return_atomic->type_params[1],
+            );
+        } elseif ($return_atomic instanceof TGenericObject
             && $contextual_atomic->value === $return_atomic->value
         ) {
             foreach ($return_atomic->type_params as $offset => $return_type_param) {
