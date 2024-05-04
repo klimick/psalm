@@ -11,28 +11,16 @@ use Psalm\Type\Union;
 
 final class ContextualTypeResolver
 {
-    private Union $contextual_type;
-    private TemplateResult $template_result;
-    private Codebase $codebase;
-
     public function __construct(
-        Union $contextual_type,
-        TemplateResult $template_result,
-        Codebase $codebase,
+        private readonly Union $contextual_type,
+        private readonly TemplateResult $template_result,
+        private readonly Codebase $codebase,
     ) {
-        $this->contextual_type = $contextual_type;
-        $this->template_result = $template_result;
-        $this->codebase = $codebase;
     }
 
-    /**
-     * @return ($type is Union ? self : null)
-     */
-    public function withContextualType(?Union $type): ?self
+    public function withContextualType(Union $type): self
     {
-        return $type !== null
-            ? new self($type, $this->template_result, $this->codebase)
-            : null;
+        return new self($type, $this->template_result, $this->codebase);
     }
 
     public function resolve(): Union
