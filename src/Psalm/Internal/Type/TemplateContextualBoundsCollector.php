@@ -99,10 +99,7 @@ final class TemplateContextualBoundsCollector
         }
     }
 
-    /**
-     * @param TCallable|TClosure $contextual_atomic
-     */
-    private function collectCallable(Atomic $contextual_atomic, Atomic $return_atomic): void
+    private function collectCallable(TCallable|TClosure $contextual_atomic, Atomic $return_atomic): void
     {
         $codebase = $this->statements_analyzer->getCodebase();
 
@@ -127,10 +124,7 @@ final class TemplateContextualBoundsCollector
         }
     }
 
-    /**
-     * @param TIterable|TArray $contextual_atomic
-     */
-    private function collectIterable(Atomic $contextual_atomic, Atomic $return_atomic): void
+    private function collectIterable(TIterable|TArray $contextual_atomic, Atomic $return_atomic): void
     {
         if ($return_atomic instanceof TArray || $return_atomic instanceof TIterable) {
             $this->collectUnion($contextual_atomic->type_params[0], $return_atomic->type_params[0]);
