@@ -895,6 +895,31 @@ final class TemplateStandinTypeReplacer
         }
 
         if ($add_lower_bound && $input_type && !$template_result->readonly) {
+            $replacement_type = TypeExpander::expandUnion(
+                $codebase,
+                $replacement_type,
+                $calling_class,
+                $calling_class,
+                null,
+            );
+
+            if ($depth < 10) {
+                $replacement_type = self::replace(
+                    $replacement_type,
+                    $template_result,
+                    $codebase,
+                    $statements_analyzer,
+                    $input_type,
+                    $input_arg_offset,
+                    $calling_class,
+                    $calling_function,
+                    true,
+                    true,
+                    $bound_equality_classlike,
+                    $depth + 1,
+                );
+            }
+
             $matching_input_keys = [];
 
             if (UnionTypeComparator::canBeContainedBy(

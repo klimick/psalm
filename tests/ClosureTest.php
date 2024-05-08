@@ -17,6 +17,43 @@ class ClosureTest extends TestCase
     public function providerValidCodeParse(): iterable
     {
         return [
+            'resolveNestedUpperBoundsCorrectly' => [
+                'code' => '<?php
+                    /** @template T */
+                    final readonly class Value
+                    {
+                        /** @param T $value */
+                        public function __construct(public mixed $value) {}
+                    }
+
+                    /**
+                     * @template A
+                     * @template B of Value<A>
+                     *
+                     * @param callable(B): B $function
+                     * @return callable(B): B
+                     */
+                    function doSomething(callable $function): callable
+                    {
+                        return $function;
+                    }
+
+                    /**
+                     * @param Value<int> $v
+                     * @return Value<int>
+                     */
+                    function addOne(Value $v): Value
+                    {
+                        return new Value($v->value + 1);
+                    }
+
+                    $fn = doSomething(addOne(...));',
+                'assertions' => [
+                    '$fn' => 'callable(Value<int>):Value<int>',
+                ],
+                'ignored_issues' => [],
+                'php_version' => '8.2',
+            ],
             'byRefUseVar' => [
                 'code' => '<?php
                     $doNotContaminate = 123;
@@ -1027,6 +1064,50 @@ class ClosureTest extends TestCase
     public function providerInvalidCodeParse(): iterable
     {
         return [
+            'resolveNestedUpperBoundsCorrectly' => [
+                'code' => '<?php
+                    /** @template T */
+                    final readonly class Value
+                    {
+                        /** @param T $value */
+                        public function __construct(public mixed $value) {}
+                    }
+
+                    /**
+                     * @template A
+                     * @template B of Value<A>
+                     *
+                     * @param callable(B): B $function
+                     * @param B $_value
+                     * @return callable(B): B
+                     */
+                    function doSomething(callable $function, mixed $_value): callable
+                    {
+                        return $function;
+                    }
+
+                    /**
+                     * @param Value<int> $v
+                     * @return Value<int>
+                     */
+                    function addOne(Value $v): Value
+                    {
+                        return new Value($v->value + 1);
+                    }
+
+                    /**
+                     * @return Value<string>
+                     */
+                    function getString(): Value
+                    {
+                        return new Value("...");
+                    }
+
+                    $_ = doSomething(addOne(...), getString());',
+                'error_message' => 'InvalidArgument',
+                'ignored_issues' => [],
+                'php_version' => '8.2',
+            ],
             'wrongArg' => [
                 'code' => '<?php
                     $bar = ["foo", "bar"];
