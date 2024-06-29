@@ -419,7 +419,9 @@ final class NewAnalyzer extends CallAnalyzer
                 : null;
 
             $collected_argument_templates = new CollectedArgumentTemplates(
-                template_types: $storage->template_types ?? [],
+                template_types: $method_storage !== null && $method_storage->defining_fqcln !== null
+                    ? $codebase->classlikes->getStorageFor($method_storage->defining_fqcln)?->template_types ?? []
+                    : $storage->template_types ?? [],
                 lower_bounds: [],
             );
 
