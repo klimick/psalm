@@ -17,6 +17,7 @@ use Psalm\Issue\DuplicateParam;
 use Psalm\Issue\PossiblyUndefinedVariable;
 use Psalm\Issue\UndefinedVariable;
 use Psalm\IssueBuffer;
+use Psalm\Storage\FunctionLikeParameter;
 use Psalm\Storage\FunctionStorage;
 use Psalm\Storage\MethodStorage;
 use Psalm\Storage\UnserializeMemoryUsageSuppressionTrait;
@@ -372,13 +373,21 @@ final class ClosureAnalyzer extends FunctionLikeAnalyzer
 
         $possible_template_definers = self::getPossibleTemplateDefiners($statements_analyzer);
 
-        foreach ($calling_closure_storage->params as $param_index => $calling_param) {
-            $contextual_param_type = $contextual_callable_type->params[$param_index]->type ?? null;
+        foreach ($contextual_callable_type->params as $param_index => $contextual_param) {
+            // An anonymous function with fewer arguments than expected by the context has been passed.
+            // See ContextualInference::('infer types with omitted closure params')
+            if (!isset($calling_closure_storage->params[$param_index])) {
+                // Avoid false-positive UnusedClosureParam issue.
+                $synthetic_param = clone $contextual_param;
+                $synthetic_param->name = '$_'.$param_index;
 
-            // No contextual type info. Don't infer.
-            if ($contextual_param_type === null) {
+                $calling_closure_storage->addParam($synthetic_param, null !== $synthetic_param->type);
+
                 continue;
             }
+
+            $contextual_param_type = $contextual_param->type ?? Type::getMixed();
+            $calling_param = $calling_closure_storage->params[$param_index];
 
             // Explicit docblock type. Don't infer.
             if ($calling_param->type !== $calling_param->signature_type) {
